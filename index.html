@@ -232,11 +232,31 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
 .clock.over .clock-bar i { background: var(--bad); }
 .clock .num { font-size: 22px; min-width: 2.2em; text-align: right; font-weight: 500; }
 .log td.cur { background: var(--accent-soft); }
+#sysTable tr[data-k] { cursor: pointer; }
+#sysTable tr[aria-selected="true"] td { background: var(--accent-soft); }
+#sysTable td b { font-family: var(--f-num); }
+@keyframes flash { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 70%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+.sc-p.flash { animation: flash 0.45s ease-out; }
+@media (prefers-reduced-motion: reduce) { .sc-p.flash { animation: none; outline: 3px solid var(--good); } }
+#scKeyStep { font-size: 15px; font-weight: 600; }
+#scKeyStep kbd { font-family: var(--f-num); }
 /* 큰 화면: 점수만 크게 */
 body.focus .bar, body.focus .tabs, body.focus #scSide, body.focus #scLogWrap, body.focus #scNote { display: none !important; }
 body.focus #scGame .sc-score b { font-size: clamp(72px, 18vw, 160px); }
 body.focus #scGame .pname { font-size: clamp(18px, 3.5vw, 30px); }
 body.focus .btn.big { min-height: 84px; font-size: 20px; }
+/* 큰 화면 + 가로로 눕힌 휴대폰·태블릿: 점수는 왼쪽, 버튼은 오른쪽 */
+@media (orientation: landscape) and (max-height: 640px) {
+  body.focus #scGame { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 30%); grid-template-areas: "head head" "board act" "board clock" "board tools" "board msg"; gap: 10px; align-content: start; }
+  body.focus #scGame > .panel-head { grid-area: head; }
+  body.focus #scBoard { grid-area: board; }
+  body.focus #scGame .sc-actions { grid-area: act; grid-template-columns: 1fr; }
+  body.focus #scClock { grid-area: clock; }
+  body.focus #scGame > .row-inline { grid-area: tools; }
+  body.focus #scMsg { grid-area: msg; }
+  body.focus #scGame .sc-score b { font-size: clamp(56px, 16vh, 120px); }
+  body.focus .wrap { padding-bottom: 16px; }
+}
 
 /* 꿀팁 */
 details.tip { border-top: 1px solid var(--line); }
@@ -307,6 +327,12 @@ details.settings { box-shadow: var(--shadow); }
 @keyframes shimmer { 50% { opacity: 0.45; } }
 .chip.skel > * { animation: shimmer 1.2s ease-in-out infinite; }
 .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.coach { font-size: 14px; line-height: 1.65; white-space: pre-wrap; background: var(--surface-2); border-radius: 10px; padding: 12px; max-width: 70ch; }
+.live-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); display: inline-block; margin-right: 6px; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+.live-dot { animation: pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
 
 /* 떠 있는 알림 */
 #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 40;
@@ -338,6 +364,11 @@ details.settings { box-shadow: var(--shadow); }
   .tabs button[aria-selected="true"] { color: var(--accent); background: var(--accent-soft); }
   .wrap { padding-bottom: calc(var(--nav-h) + 28px + env(safe-area-inset-bottom, 0px)); }
   #toast { bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom, 0px)); }
+}
+/* 휴대폰 시스템 표: 표를 내려도 당구대가 위에 붙어 있게 */
+@media (max-width: 979px) {
+  .view-table.sys .table-col { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 6px; }
+  .view-table.sys .stage-foot, .view-table.sys .toolbar .status { display: none; }
 }
 /* 넓은 화면: 2단 */
 @media (min-width: 760px) {
@@ -425,11 +456,16 @@ details.settings { box-shadow: var(--shadow); }
       <div class="seg" role="group" aria-label="보기 방식">
         <button type="button" id="mRec" aria-pressed="true">추천 공략</button>
         <button type="button" id="mAim" aria-pressed="false">직접 조준</button>
+        <button type="button" id="mSys" aria-pressed="false">시스템 표</button>
       </div>
       <div class="quick-my"><span class="lbl">내 공</span><div class="seg" id="quickMy" role="group" aria-label="내 공"><button type="button" data-v="white"><i class="bdot" style="background:var(--ball-white)"></i>흰공</button><button type="button" data-v="yellow"><i class="bdot" style="background:var(--ball-yellow)"></i>노란공</button></div></div>
       <div class="status" id="status"></div>
     </div>
     <div class="stage"><canvas id="cvTable" aria-label="당구대 평면도와 공 경로"></canvas></div>
+    <div class="tipbox" id="aiRow" hidden>
+      <div id="aiRowText">사진에서 못 찾은 공이 있으면 Claude가 사진을 보고 공 위치를 찾아 줄 수 있어요.</div>
+      <div class="row-inline"><button type="button" class="btn sm primary" id="btnAiBalls">Claude로 공 찾기</button></div>
+    </div>
     <div class="stage-foot">
       <p class="hint" id="tableHint">공을 끌어서 위치를 고칠 수 있어요. 놓으면 길을 다시 계산합니다.</p>
       <div class="stage-btns">
@@ -445,6 +481,17 @@ details.settings { box-shadow: var(--shadow); }
       <label class="row-inline sub" for="hideIn"><input type="checkbox" id="hideIn"> 연습: 정답 가리고 먼저 생각해 보기</label>
       <div class="chips" id="solChips" role="group" aria-label="추천 공략 목록"></div>
       <div id="solDetail"></div>
+    </div>
+
+    <div id="sysPanel" class="panel" hidden>
+      <div class="panel-head"><h2>이 자리 시스템 표</h2><span class="sub">공 위치에서 직접 굴려 만든 표</span></div>
+      <p class="hint">수구를 지금 자리에 두고 장쿠션 포인트마다 겨냥했을 때 3쿠션이 어디에 닿는지 보여 줘요. 파이브앤하프처럼 쓰되, 숫자를 외우지 않아도 되고 보정 설정이 그대로 반영돼요.</p>
+      <div class="row-inline">
+        <div class="seg" id="sysRail" role="group" aria-label="1쿠션 장쿠션"><button type="button" data-v="2">1쿠션 위 장</button><button type="button" data-v="0">1쿠션 아래 장</button></div>
+        <div class="seg" id="sysTip" role="group" aria-label="회전"><button type="button" data-v="2">2팁</button><button type="button" data-v="3">3팁</button><button type="button" data-v="-1">반대 회전</button></div>
+      </div>
+      <div class="scroll-x"><table class="list" id="sysTable"></table></div>
+      <p class="sub" id="sysNote"></p>
     </div>
 
     <div id="aimPanel" class="panel" hidden>
@@ -523,15 +570,26 @@ details.settings { box-shadow: var(--shadow); }
   <section id="tabScore" class="col" hidden>
     <div class="panel" id="scSetup">
       <div class="panel-head"><h2>경기 설정</h2><span class="sub">1명은 혼자 연습, 2~6명은 개인전</span></div>
+      <div class="set-row"><label>종목</label>
+        <div class="seg" id="scType"><button type="button" data-v="3c">3쿠션</button><button type="button" data-v="4b">4구 (1득점 10점)</button></div></div>
       <div class="set-row"><label>인원</label>
         <div class="stepper"><button type="button" class="mini" id="scMinus" aria-label="인원 줄이기">−</button><b id="scCount">2</b><button type="button" class="mini" id="scPlus" aria-label="인원 늘리기">+</button></div></div>
       <div class="pl-list" id="scPlayers"></div>
+      <datalist id="rosterNames"></datalist>
+      <div class="row-inline"><button type="button" class="btn sm" id="scRosterSave">이 선수들 명단에 저장</button><span class="sub">명단에 있는 이름을 고르면 그 사람 점수(핸디)가 자동으로 들어가요</span></div>
+      <details class="tip" id="scRosterBox"><summary>선수 명단 <span class="sub" id="scRosterCount"></span></summary><div class="scroll-x" id="scRoster"></div></details>
       <div class="set-row"><label for="scLimit">이닝 제한<span class="sub">0이면 제한 없음. 혼자 연습이면 '20이닝 에버 측정'처럼 써요</span></label>
         <input class="num-in" id="scLimit" type="number" inputmode="numeric" min="0" max="99" value="0"></div>
       <div class="set-row"><label>샷 클락<span class="sub">한 샷에 쓸 수 있는 시간. 10초 남으면 소리로 알려요</span></label>
         <div class="seg" id="scClockSeg"><button type="button" data-v="0">끔</button><button type="button" data-v="30">30초</button><button type="button" data-v="40">40초</button><button type="button" data-v="50">50초</button><button type="button" data-v="60">60초</button></div></div>
       <div class="set-row"><label for="scTeam">팀전<span class="sub">이름 칸에 '철수, 영희'처럼 쉼표로 팀원을 적으면 이닝마다 번갈아 쳐요</span></label><input type="checkbox" id="scTeam"></div>
-      <div class="set-row"><label for="scVoice">음성 안내<span class="sub">득점과 차례를 읽어 줘요</span></label><input type="checkbox" id="scVoice"></div>
+      <div class="set-row" id="scLiveRow" hidden><label for="scLive">실시간 중계<span class="sub">같은 링크를 연 클럽 사람들이 점수를 실시간으로 봐요</span></label><input type="checkbox" id="scLive"></div>
+      <div class="set-row"><label for="scVoice">음성 안내<span class="sub" id="scVoiceSub">득점과 차례를 읽어 줘요</span></label><input type="checkbox" id="scVoice"></div>
+      <div class="set-row"><label>리모컨 · 키보드<span class="sub" id="scKeyInfo"></span></label><button type="button" class="btn sm" id="scKeyLearn">리모컨 버튼 지정</button></div>
+      <div class="tipbox" id="scKeyPanel" hidden>
+        <div id="scKeyStep"></div>
+        <div class="row-inline"><button type="button" class="btn sm" id="scKeySkip">이 동작 건너뛰기</button><button type="button" class="btn sm" id="scKeyReset">기본값으로</button><button type="button" class="btn sm" id="scKeyDone">끝내기</button></div>
+      </div>
       <button type="button" class="btn primary big" id="scStart">경기 시작</button>
     </div>
 
@@ -553,11 +611,23 @@ details.settings { box-shadow: var(--shadow); }
         <button type="button" class="btn sm" id="scNew">새 경기</button>
       </div>
       <p class="toast info" id="scMsg" hidden></p>
+      <p class="sub" id="scAwake" style="margin:0"></p>
       <div id="scLogWrap"><span class="lbl">이닝별 득점</span><div class="scroll-x" id="scLog"></div></div>
-      <p class="note" id="scNote">득점하면 +1, 못 맞히면 공타. 누가 목표에 닿으면 그 이닝을 끝까지 돌려 뒷순서 선수에게 같은 이닝 기회를 줍니다. 경기 중에는 화면이 꺼지지 않게 해 둬요.<br>키보드·블루투스 리모컨: <span class="kbd">Space</span> 또는 <span class="kbd">↑</span> 득점 · <span class="kbd">Enter</span> 또는 <span class="kbd">↓</span> 공타 · <span class="kbd">←</span> 되돌리기</p>
+      <p class="note" id="scNote">득점하면 +1, 못 맞히면 공타. 누가 목표에 닿으면 그 이닝을 끝까지 돌려 뒷순서 선수에게 같은 이닝 기회를 줍니다. 경기 중에는 화면이 꺼지지 않게 해 둬요.<br>키보드·블루투스 리모컨: <span class="kbd">Space</span> 또는 <span class="kbd">↑</span> 득점 · <span class="kbd">Enter</span> 또는 <span class="kbd">↓</span> 공타 · <span class="kbd">←</span> 되돌리기. 다른 버튼을 쓰려면 경기 설정의 '리모컨 버튼 지정'.</p>
     </div>
 
     <div id="scSide" class="col">
+    <div class="panel" id="clubPanel" hidden>
+      <div class="panel-head"><h2>클럽 기록 · 함께 보기</h2><span class="sub" id="clubStatus"></span></div>
+      <div class="row-inline" id="clubWriteRow" hidden>
+        <label class="row-inline sub" for="clubAuto"><input type="checkbox" id="clubAuto" checked> 끝난 경기를 클럽 기록에 자동으로 올리기</label>
+        <button type="button" class="btn sm" id="clubUpAll">이 기기 기록 올리기</button>
+      </div>
+      <div id="clubLive"></div>
+      <div id="clubWatch"></div>
+      <span class="lbl">클럽 선수 기록</span><div class="scroll-x" id="clubStats"></div>
+      <span class="lbl">클럽 최근 경기</span><div class="scroll-x" id="clubHist"></div>
+    </div>
     <div class="panel">
       <div class="panel-head"><h2>내 기록</h2><span class="sub">이 기기에 저장된 경기 기준</span></div>
       <div class="scroll-x" id="scMine"></div>
@@ -565,6 +635,11 @@ details.settings { box-shadow: var(--shadow); }
     <div class="panel">
       <div class="panel-head"><h2>최근 경기</h2><button type="button" class="mini del" id="scClear">기록 지우기</button></div>
       <div class="scroll-x" id="scHist"></div>
+      <div class="row-inline">
+        <button type="button" class="btn sm" id="scExport">기록 백업 저장</button>
+        <label class="btn sm upload" for="scImport">백업 불러오기<input type="file" id="scImport" class="file-cover" accept=".json,application/json,text/plain"></label>
+        <span class="sub">휴대폰을 바꾸거나 브라우저 기록을 지워도 경기 기록을 옮길 수 있어요</span>
+      </div>
     </div>
     </div>
   </section>
@@ -1002,7 +1077,35 @@ const Engine = (() => {
     return rail < 0 ? null : { rail, x: px + ux * best, y: py + uy * best };
   }
 
-  return { R, TABLES, P, VERT, ES, makeCtx, sim, solve, needSpeed, powerLevel, POWER, LEVEL_SPEED, riskCheck, decodeSig, objectPath, timeline, posAt, railHit };
+  // 이 자리 시스템 표: 장쿠션의 반 포인트마다 겨냥했을 때 3쿠션이 닿는 곳
+  // rail: 2 = 화면 위 장쿠션, 0 = 화면 아래 장쿠션. 포인트는 화면 왼쪽 0 → 오른쪽 8
+  function sysTable(o, opt = {}) {
+    const base = makeCtx(o);
+    const C = Object.assign({}, base, { objs: [{ x: -50, y: -50 }, { x: -60, y: -60 }] });
+    const rail = opt.rail === 0 ? 0 : 2, E = opt.E == null ? 2 : opt.E, vk = opt.vk == null ? 0 : opt.vk;
+    const ty = rail === 2 ? C.H - R : R;
+    const rows = [];
+    for (let k = 0; k <= 16; k++) {
+      const tx = Math.min(C.W - R, Math.max(R, k * C.W / 16));
+      const th = Math.atan2(ty - C.cue.y, tx - C.cue.x);
+      // auto: 1쿠션 뒤 진행 방향으로 도는 순회전 (오른쪽 당점 = 위 장쿠션에서 오른쪽으로 밀어 줌)
+      const dir = tx >= C.cue.x ? 1 : -1;
+      const Er = opt.auto ? Math.abs(E) * (rail === 2 ? dir : -dir) * (opt.flip ? -1 : 1) : E;
+      const rec = sim(C, th, Er, vk, true);
+      const cs = rec.evs.filter(e => e.type === 'c');
+      const ok = cs.length >= 3 && cs[0].rail === rail;
+      const pt = e => (e.rail === 0 || e.rail === 2) ? e.x / (C.W / 8) : (C.H - e.y) / (C.H / 4);
+      rows.push({
+        aim: k / 2, theta: th, ok, E: Er,
+        third: ok ? { rail: cs[2].rail, pt: pt(cs[2]) } : null,
+        fourth: cs.length >= 4 ? { rail: cs[3].rail, pt: pt(cs[3]) } : null,
+        path: rec.path.slice(0, 5)
+      });
+    }
+    return rows;
+  }
+
+  return { R, TABLES, P, VERT, ES, makeCtx, sim, solve, needSpeed, powerLevel, POWER, LEVEL_SPEED, riskCheck, decodeSig, objectPath, timeline, posAt, railHit, sysTable };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
 
@@ -1272,13 +1375,14 @@ const Core = (() => {
   function create(players, opts = {}) {
     const ps = players.slice(0, 6).map((p, i) => ({
       name: String(p.name || '').trim() || `선수 ${i + 1}`,
-      target: Math.max(1, Math.min(500, Math.round(+p.target) || 20)),
+      target: Math.max(1, Math.min(opts.step > 1 ? 5000 : 500, Math.round(+p.target) || 20)),
       score: 0, inn: 0, high: 0, log: [],
       // 팀전: 이름 칸에 '철수, 영희'처럼 적으면 팀원이 이닝마다 번갈아 침
       members: opts.team ? String(p.name || '').split(/[,·/]/).map(x => x.trim()).filter(Boolean) : null
     }));
     if (!ps.length) throw new Error('players');
-    const g = { players: ps, turn: 0, round: 1, run: 0, limit: Math.max(0, Math.round(+opts.limit) || 0), team: !!opts.team, closing: false, done: false, reason: '' };
+    const step = Math.max(1, Math.round(+opts.step) || 1);
+    const g = { players: ps, turn: 0, round: 1, run: 0, step, limit: Math.max(0, Math.round(+opts.limit) || 0), team: !!opts.team, closing: false, done: false, reason: '' };
     startTurn(g, 0);
     return g;
   }
@@ -1297,7 +1401,8 @@ const Core = (() => {
   function hit(g) {
     if (g.done) return g;
     const p = g.players[g.turn];
-    p.score++; p.log[p.log.length - 1]++; g.run++; p.high = Math.max(p.high, g.run);
+    const st = g.step || 1;
+    p.score = Math.min(p.target, p.score + st); p.log[p.log.length - 1] += st; g.run += st; p.high = Math.max(p.high, g.run);
     if (p.score >= p.target) { g.closing = true; endTurn(g); }
     return g;
   }
@@ -1339,6 +1444,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     source: 'sample', detect: null,
     mode: 'rec', sols: [], sel: 0, solving: false, solveId: 0,
     aim: { theta: 0.43, E: 1, vk: 0, power: 2 },
+    sys: { rail: 2, tip: 2, flip: false, sel: 6, rows: [] },
     photo: null, quad: null, warped: null, view: 'table'
   };
   try {
@@ -1398,7 +1504,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     }, 20);
   }
   function requestSolve() {
-    stopAnim(); if (typeof renderCode === 'function') renderCode();
+    stopAnim(); if (state.mode === 'sys') { state.sys.rows = Engine.sysTable(ctxObj(), { rail: state.sys.rail, E: state.sys.tip, flip: state.sys.flip, auto: true, vk: 0 }); renderSys(); } if (typeof renderCode === 'function') renderCode();
     state.solving = true; state.solveId++;
     renderStatus(); renderRec();
     if (worker) worker.postMessage({ id: state.solveId, o: ctxObj() });
@@ -1573,7 +1679,9 @@ if (typeof module !== 'undefined') module.exports = Core;
       <tr><th>위험</th><td>${risks.join(' ')}</td></tr>
     </table>
     <div class="tipbox">${routeTips(s).map(t => `<div><b>${t[0]}</b>${t[1]}</div>`).join('')}</div>
-    <div class="detail-actions"><button type="button" class="btn sm primary" id="btnPlay2">샷 보기</button><button type="button" class="btn sm" id="btnTryAim">이 길로 직접 조준해 보기</button></div>`;
+    <div class="detail-actions"><button type="button" class="btn sm primary" id="btnPlay2">샷 보기</button><button type="button" class="btn sm" id="btnTryAim">이 길로 직접 조준해 보기</button><button type="button" class="btn sm" id="btnCoach"${Ai.sample ? '' : ' hidden'}>Claude 코치에게 설명 듣기</button></div>
+    <div class="coach" id="coachOut" aria-live="polite" hidden></div>`;
+    $('#btnCoach').addEventListener('click', coach);
     $('#btnPlay2').addEventListener('click', () => { $('#cvTable').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); if (!anim) playShot(); });
     $('#btnTryAim').addEventListener('click', () => $('#mAim').click());
   }
@@ -1632,6 +1740,7 @@ if (typeof module !== 'undefined') module.exports = Core;
 
   function currentShot() {
     if (state.mode === 'aim') return aimShot;
+    if (state.mode === 'sys') return null;
     const s = state.sols[state.sel];
     if (!s || state.solving || (state.hideAns && !state.revealed)) return null;
     return { rec: s.rec, objPts: s.risk.objPts };
@@ -1715,6 +1824,16 @@ if (typeof module !== 'undefined') module.exports = Core;
       if (rec.stopAt) {
         const p = M(rec.stopAt); g.save(); g.strokeStyle = css('--bad'); g.lineWidth = 2.2;
         g.beginPath(); g.moveTo(p.x - 5, p.y - 5); g.lineTo(p.x + 5, p.y + 5); g.moveTo(p.x + 5, p.y - 5); g.lineTo(p.x - 5, p.y + 5); g.stroke(); g.restore();
+      }
+    }
+    // 시스템 표: 반 포인트마다 굴린 길(옅게) + 고른 길(굵게)
+    if (state.mode === 'sys' && state.sys.rows.length && !anim) {
+      state.sys.rows.forEach((r, k) => { if (r.ok && k !== state.sys.sel && k % 2 === 0) polyline(g, r.path.slice(0, 4).map(M), 'rgba(255,255,255,0.28)', 1, null); });
+      const r = state.sys.rows[state.sys.sel];
+      if (r) {
+        const pts = r.path.slice(0, 5).map(M);
+        polyline(g, pts, css('--path'), 2.2, null, css('--path-edge'));
+        for (let i = 0; i < pts.length - 1; i++) arrowOn(g, pts[i], pts[i + 1], css('--path'));
       }
     }
     // 공
@@ -1806,6 +1925,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     if (drag.kind === 'ball') {
       state.balls[drag.key] = clampBall({ x: p.x + drag.ox, y: p.y + drag.oy });
       if (state.mode === 'aim') updateAim(); else { state.sols = []; }
+      if (state.mode === 'sys' && drag.key === state.myBall) { state.sys.rows = Engine.sysTable(ctxObj(), { rail: state.sys.rail, E: state.sys.tip, flip: state.sys.flip, auto: true, vk: 0 }); renderSys(); }
       drawTable();
     } else setAimFrom(p);
   });
@@ -1982,9 +2102,13 @@ if (typeof module !== 'undefined') module.exports = Core;
     state.mode = m;
     $('#mRec').setAttribute('aria-pressed', String(m === 'rec'));
     $('#mAim').setAttribute('aria-pressed', String(m === 'aim'));
+    $('#mSys').setAttribute('aria-pressed', String(m === 'sys'));
     $('#recPanel').hidden = m !== 'rec';
     $('#aimPanel').hidden = m !== 'aim';
-    $('#tableHint').textContent = m === 'aim' ? '빈 곳을 끌면 조준, 공을 끌면 위치 이동이에요.' : '공을 끌어서 위치를 고칠 수 있어요. 놓으면 길을 다시 계산합니다.';
+    $('#sysPanel').hidden = m !== 'sys';
+    $('#viewTable').classList.toggle('sys', m === 'sys');
+    if (m === 'sys') computeSys();
+    $('#tableHint').textContent = m === 'aim' ? '빈 곳을 끌면 조준, 공을 끌면 위치 이동이에요.' : m === 'sys' ? '수구를 끌어 옮기면 표가 바로 바뀌어요.' : '공을 끌어서 위치를 고칠 수 있어요. 놓으면 길을 다시 계산합니다.';
     if (m === 'aim') {
       const s = state.sols[state.sel];
       if (s && !aimShot) { state.aim.theta = s.theta; state.aim.E = s.E; state.aim.vk = s.vk; state.aim.power = Math.min(5, s.pw.lv); }
@@ -1993,6 +2117,26 @@ if (typeof module !== 'undefined') module.exports = Core;
     drawTable();
   }
   $('#mRec').addEventListener('click', () => setMode('rec'));
+  $('#mSys').addEventListener('click', () => setMode('sys'));
+
+  // ---------- 시스템 표 ----------
+  const RAILSHORT = ['아래 장', '오른쪽 단', '위 장', '왼쪽 단'];
+  function computeSys() {
+    state.sys.rows = Engine.sysTable(ctxObj(), { rail: state.sys.rail, E: state.sys.tip, flip: state.sys.flip, auto: true, vk: 0 });
+    renderSys(); drawTable();
+  }
+  function renderSys() {
+    const S = state.sys;
+    [...$('#sysRail').children].forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.v === S.rail)));
+    [...$('#sysTip').children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === '-1' ? S.flip : +b.dataset.v === S.tip)));
+    $('#sysTable').innerHTML = '<tr><th>1쿠션 겨냥</th><th>3쿠션 도착</th><th>4쿠션</th></tr>' + S.rows.map((r, k) =>
+      `<tr data-k="${k}" aria-selected="${k === S.sel}"><td>${RAILSHORT[S.rail]} <b>${r.aim.toFixed(1)}</b></td><td>${r.ok ? `${RAILSHORT[r.third.rail]} <b>${r.third.pt.toFixed(1)}</b>` : '<span class="sub">3쿠션 전에 멈춤</span>'}</td><td class="sub">${r.fourth ? `${RAILSHORT[r.fourth.rail]} ${r.fourth.pt.toFixed(1)}` : '-'}</td></tr>`).join('');
+    const sel = S.rows[S.sel];
+    $('#sysNote').textContent = `${S.flip ? '역회전' : '순회전(1쿠션 뒤 진행 방향)'} ${S.tip}팁 · 상단${sel ? ` · 고른 줄은 ${sel.E > 0 ? '오른쪽' : '왼쪽'} 당점` : ''} · 적구는 무시. 포인트는 화면 기준 장쿠션 왼쪽 0 → 오른쪽 8, 단쿠션 위 0 → 아래 4. 표 줄을 누르면 그 길을 당구대에 굵게 그려요.`;
+  }
+  $('#sysRail').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { state.sys.rail = +b.dataset.v; computeSys(); } });
+  $('#sysTip').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.v === '-1') state.sys.flip = !state.sys.flip; else state.sys.tip = +b.dataset.v; computeSys(); });
+  $('#sysTable').addEventListener('click', e => { const tr = e.target.closest('tr[data-k]'); if (tr) { state.sys.sel = +tr.dataset.k; renderSys(); drawTable(); } });
   $('#mAim').addEventListener('click', () => { aimShot = null; setMode('aim'); });
   $('#solChips').addEventListener('click', e => {
     const b = e.target.closest('.chip'); if (!b) return;
@@ -2235,6 +2379,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     }
     state.source = 'photo';
     saveLayout();
+    setTimeout(() => { if (typeof updateAi === 'function') updateAi(); }, 0);
     aimShot = null;
     showView('table');
     if (state.mode === 'aim') updateAim();
@@ -2368,11 +2513,51 @@ if (typeof module !== 'undefined') module.exports = Core;
   }
   $('#fhCue').addEventListener('input', fiveHalf); $('#fhArr').addEventListener('input', fiveHalf); fiveHalf();
 
+  // ---------- 기록 표 (내 기록 · 클럽 기록 공용) ----------
+  const fmtDay = d => { const x = new Date(d); return `${x.getMonth() + 1}/${x.getDate()}`; };
+  const av3 = (sc, inn) => inn > 0 ? (sc / inn).toFixed(3) : '0.000';
+  function histHtml(a, empty) {
+    return a.length ? `<table class="list"><tr><th>날짜</th><th>선수 · 점수</th><th class="r">이닝</th><th>결과</th></tr>${a.slice(0, 20).map(r =>
+      `<tr><td>${fmtDay(r.d)}</td><td>${r.k === '4b' ? '<span class="sub">4구</span> ' : ''}${r.n.map((n, i) => `${esc(n)} <span class="num">${r.s[i]}/${r.t[i]}</span>`).join(' · ')}</td><td class="r num">${Math.max(...r.i)}</td><td>${esc(r.res)}</td></tr>`).join('')}</table>`
+      : `<p class="sub" style="margin:0">${empty}</p>`;
+  }
+  function statsHtml(a, empty) {
+    const by = new Map();
+    for (const r of a) r.n.forEach((nm, i) => {
+      const k = r.k === '4b' ? `${nm} (4구)` : nm;
+      const o = by.get(k) || { g: 0, s: 0, i: 0, h: 0, w: 0, recent: [] };
+      o.g++; o.s += r.s[i]; o.i += r.i[i]; o.h = Math.max(o.h, r.h[i]);
+      if (r.n.length > 1 && r.res === `${nm} 승`) o.w++;
+      if (o.recent.length < 10) o.recent.push([r.s[i], r.i[i]]);
+      by.set(k, o);
+    });
+    const rows = [...by.entries()].sort((x, y) => y[1].g - x[1].g);
+    const h2h = new Map();
+    for (const r of a) if (r.n.length === 2 && r.n[0] !== r.n[1] && r.k !== '4b') {
+      const [x, y] = [...r.n].sort(), key = x + '\u0000' + y, o = h2h.get(key) || { x, y, wx: 0, wy: 0, d: 0 };
+      if (r.res === `${x} 승`) o.wx++; else if (r.res === `${y} 승`) o.wy++; else o.d++;
+      h2h.set(key, o);
+    }
+    const h2hHtml = h2h.size ? `<span class="lbl">상대 전적</span><table class="list"><tr><th>대결</th><th class="r">승-무-패</th></tr>${[...h2h.values()].map(o => `<tr><td>${esc(o.x)} vs ${esc(o.y)}</td><td class="r num">${o.wx}-${o.d}-${o.wy}</td></tr>`).join('')}</table>` : '';
+    return rows.length ? `<table class="list"><tr><th>이름</th><th class="r">경기</th><th class="r">승</th><th class="r">전체 에버</th><th class="r">최근 10경기</th><th class="r">하이런</th></tr>${rows.map(([k, o]) => {
+      const rs = o.recent.reduce((q, v) => [q[0] + v[0], q[1] + v[1]], [0, 0]);
+      return `<tr><td>${esc(k)}</td><td class="r num">${o.g}</td><td class="r num">${o.w}</td><td class="r num">${av3(o.s, o.i)}</td><td class="r num">${av3(rs[0], rs[1])}</td><td class="r num">${o.h}</td></tr>`;
+    }).join('')}</table>${h2hHtml}` : `<p class="sub" style="margin:0">${empty}</p>`;
+  }
+  // 점수판 → 클럽 기록 연결 고리 (클럽 기능이 켜질 때 채워짐)
+  const hooks = { onDone: null, onLive: null };
+
   // ---------- 점수판 ----------
   const Score = (() => {
     const SC = Core.score;
     const KEY = 'cue3-score2', HKEY = 'cue3-history';
-    let cfg = { players: [{ name: '선수 A', target: 20 }, { name: '선수 B', target: 20 }], limit: 0, clock: '0', voice: false, team: false };
+    let cfg = { players: [{ name: '선수 A', target: 20 }, { name: '선수 B', target: 20 }], limit: 0, clock: '0', voice: false, team: false, type: '3c' };
+    const DEF = { '3c': 20, '4b': 200 };
+    // 선수 명단: 이름과 종목별 점수(핸디)
+    const RKEY = 'cue3-roster';
+    const roster = () => { try { const a = JSON.parse(localStorage.getItem(RKEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+    const storeRoster = a => { try { localStorage.setItem(RKEY, JSON.stringify(a.slice(0, 100))); } catch (e) { /* 무시 */ } };
+    const rosterFind = n => roster().find(r => r.name === String(n).trim());
     let g = null, undo = [];
     try {
       const v = JSON.parse(localStorage.getItem(KEY) || 'null');
@@ -2391,23 +2576,60 @@ if (typeof module !== 'undefined') module.exports = Core;
       try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ko-KR'; u.rate = 1.05; speechSynthesis.speak(u); } catch (e) { /* 무시 */ }
     }
     let actx = null;
+    // 휴대폰은 사용자가 누른 순간에만 소리를 열어 줌: 시작 버튼에서 미리 열어 둠
+    function unlockAudio() {
+      try {
+        actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+        if (actx.state === 'suspended') actx.resume();
+        const b = actx.createBuffer(1, 1, 22050), src = actx.createBufferSource(); src.buffer = b; src.connect(actx.destination); src.start(0);
+      } catch (e) { /* 소리 없음 */ }
+      try { if (window.speechSynthesis && cfg.voice) speechSynthesis.getVoices(); } catch (e) { /* 무시 */ }
+    }
     function beep(f, d) {
       try {
         actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+        if (actx.state === 'suspended') actx.resume();
         const o = actx.createOscillator(), gn = actx.createGain();
         o.frequency.value = f; gn.gain.value = 0.12; o.connect(gn); gn.connect(actx.destination);
         o.start(); o.stop(actx.currentTime + d);
       } catch (e) { /* 소리 없음 */ }
       try { navigator.vibrate && navigator.vibrate(d * 1000); } catch (e) { /* 무시 */ }
     }
-    let lock = null;
-    async function keepAwake(on) {
+    let lock = null, vid = null, vtimer = 0;
+    // 표준 화면 켜짐 유지가 막힌 화면에서는 보이지 않는 무음 영상을 재생해 화면이 꺼지지 않게 함
+    function videoAwake(on) {
       try {
-        if (on && !lock && navigator.wakeLock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); }
-        if (!on && lock) { await lock.release(); lock = null; }
-      } catch (e) { lock = null; }
+        if (on) {
+          if (!vid) {
+            const cv = document.createElement('canvas'); cv.width = cv.height = 2;
+            if (!cv.captureStream) return false;
+            vid = document.createElement('video');
+            vid.muted = true; vid.playsInline = true; vid.setAttribute('playsinline', ''); vid.setAttribute('aria-hidden', 'true');
+            vid.srcObject = cv.captureStream(2);
+            vid.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;pointer-events:none';
+            document.body.appendChild(vid);
+            const c2 = cv.getContext('2d');
+            const tick = () => { c2.fillStyle = (Date.now() / 1000 | 0) % 2 ? '#000' : '#010101'; c2.fillRect(0, 0, 2, 2); vtimer = setTimeout(tick, 1000); };
+            tick();
+          }
+          const pr = vid.play(); if (pr && pr.catch) pr.catch(() => {});
+          return true;
+        }
+        if (vid) { vid.pause(); clearTimeout(vtimer); vid.remove(); vid = null; }
+      } catch (e) { return false; }
+      return false;
     }
-    document.addEventListener('visibilitychange', () => { if (!document.hidden && g && !g.done) keepAwake(true); });
+    function awakeNote(t) { const el = $('#scAwake'); if (el) el.textContent = t; }
+    async function keepAwake(on) {
+      if (!on) { try { if (lock) await lock.release(); } catch (e) { /* 무시 */ } lock = null; videoAwake(false); awakeNote(''); return; }
+      if (lock) return;
+      try {
+        if (navigator.wakeLock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); videoAwake(false); awakeNote('화면 켜짐 유지 중'); return; }
+      } catch (e) { lock = null; }
+      awakeNote(videoAwake(true) ? '화면 켜짐 유지 중 (보조 방식). 그래도 꺼지면 휴대폰 설정에서 화면 자동 꺼짐 시간을 늘려 주세요.' : '이 화면에서는 화면 켜짐 유지가 막혀 있어요. 휴대폰 설정에서 화면 자동 꺼짐 시간을 늘려 주세요.');
+    }
+    document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else if (g && !g.done) keepAwake(true); });
+    window.addEventListener('pagehide', () => save());
 
     // 샷 클락
     const clk = { left: 0, timer: 0, last: 0, ext: [] };
@@ -2443,41 +2665,80 @@ if (typeof module !== 'undefined') module.exports = Core;
 
     // 설정 화면
     function renderSetup() {
+      [...$('#scType').children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === cfg.type)));
+      const ro = roster();
+      $('#rosterNames').innerHTML = ro.map(r => `<option value="${esc(r.name)}"></option>`).join('');
+      $('#scRosterCount').textContent = ro.length ? `${ro.length}명` : '';
+      $('#scRoster').innerHTML = ro.length ? `<table class="list"><tr><th>이름</th><th class="r">3쿠션</th><th class="r">4구</th><th></th></tr>${ro.map((r, i) => `<tr><td>${esc(r.name)}</td><td class="r num">${r.t3 || '-'}</td><td class="r num">${r.t4 || '-'}</td><td class="r"><button type="button" class="mini del" data-rdel="${i}" aria-label="${esc(r.name)} 명단에서 빼기">빼기</button></td></tr>`).join('')}</table>`
+        : '<p class="sub" style="margin:0 0 12px">아직 없어요. 이름과 점수를 적고 \'이 선수들 명단에 저장\'을 누르세요.</p>';
+      renderKeyInfo();
       $('#scCount').textContent = cfg.players.length;
       $('#scMinus').disabled = cfg.players.length <= 1;
       $('#scPlus').disabled = cfg.players.length >= 6;
       $('#scPlayers').innerHTML = cfg.players.map((p, i) => `<div class="pl-row"><span class="idx">${i + 1}</span>
-        <input class="text-in" type="text" maxlength="12" data-i="${i}" data-k="name" value="${esc(p.name)}" aria-label="${i + 1}번 선수 이름">
-        <input class="num-in" type="number" inputmode="numeric" min="1" max="500" data-i="${i}" data-k="target" value="${p.target}" aria-label="${i + 1}번 선수 목표 점수"></div>`).join('');
+        <input class="text-in" type="text" maxlength="12" list="rosterNames" autocomplete="off" data-i="${i}" data-k="name" value="${esc(p.name)}" aria-label="${i + 1}번 선수 이름">
+        <input class="num-in" type="number" inputmode="numeric" min="1" max="${cfg.type === '4b' ? 5000 : 500}" step="${cfg.type === '4b' ? 10 : 1}" data-i="${i}" data-k="target" value="${p.target}" aria-label="${i + 1}번 선수 목표 점수"></div>`).join('');
       $('#scLimit').value = cfg.limit;
       $('#scVoice').checked = !!cfg.voice;
       $('#scTeam').checked = !!cfg.team;
+      $('#scLive').checked = !!cfg.live;
       $('#scMinus').disabled = cfg.players.length <= (cfg.team ? 2 : 1);
       [...$('#scClockSeg').children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(cfg.clock))));
       $('#scStart').textContent = cfg.players.length === 1 ? '연습 시작' : '경기 시작';
     }
     $('#scPlayers').addEventListener('input', e => {
       const t = e.target, i = +t.dataset.i; if (!cfg.players[i]) return;
-      cfg.players[i][t.dataset.k] = t.dataset.k === 'target' ? (parseInt(t.value, 10) || 20) : t.value;
+      cfg.players[i][t.dataset.k] = t.dataset.k === 'target' ? (parseInt(t.value, 10) || DEF[cfg.type]) : t.value;
+      // 명단에 있는 이름이면 그 사람 점수 자동 입력
+      if (t.dataset.k === 'name') {
+        const r = rosterFind(t.value), v = r && (cfg.type === '4b' ? r.t4 : r.t3);
+        if (v) { cfg.players[i].target = v; const box = t.parentElement.querySelector('[data-k="target"]'); if (box) box.value = v; }
+      }
       save();
     });
+    $('#scType').addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b || b.dataset.v === cfg.type) return;
+      cfg.type = b.dataset.v;
+      for (const p of cfg.players) { const r = rosterFind(p.name); p.target = (r && (cfg.type === '4b' ? r.t4 : r.t3)) || DEF[cfg.type]; }
+      renderSetup(); save();
+    });
+    $('#scRosterSave').addEventListener('click', () => {
+      const a = roster();
+      let n = 0;
+      for (const p of cfg.players) {
+        const nm = String(p.name || '').trim(); if (!nm || /^선수 [A-F1-6]$/.test(nm)) continue;
+        let r = a.find(x => x.name === nm); if (!r) { r = { name: nm }; a.push(r); }
+        r[cfg.type === '4b' ? 't4' : 't3'] = +p.target; n++;
+      }
+      storeRoster(a); renderSetup();
+      toast(n ? `${n}명을 명단에 저장했어요.` : '저장할 이름이 없어요. 기본 이름(선수 A…) 대신 실제 이름을 적어 주세요.', 'info');
+    });
+    $('#scRoster').addEventListener('click', e => { const b = e.target.closest('[data-rdel]'); if (!b) return; const a = roster(); a.splice(+b.dataset.rdel, 1); storeRoster(a); renderSetup(); });
     $('#scMinus').addEventListener('click', () => { if (cfg.players.length > (cfg.team ? 2 : 1)) { cfg.players.pop(); renderSetup(); save(); } });
     $('#scPlus').addEventListener('click', () => {
       if (cfg.players.length >= 6) return;
       const last = cfg.players[cfg.players.length - 1];
-      cfg.players.push({ name: `선수 ${String.fromCharCode(65 + cfg.players.length)}`, target: last ? last.target : 20 });
+      cfg.players.push({ name: `선수 ${String.fromCharCode(65 + cfg.players.length)}`, target: last ? last.target : DEF[cfg.type] });
       renderSetup(); save();
     });
     $('#scLimit').addEventListener('input', e => { cfg.limit = Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0)); save(); });
+    $('#scLive').addEventListener('change', e => { cfg.live = e.target.checked; save(); });
     $('#scTeam').addEventListener('change', e => {
       cfg.team = e.target.checked;
       if (cfg.team && cfg.players.length < 2) cfg.players.push({ name: '선수 B', target: cfg.players[0].target });
       renderSetup(); save();
     });
-    $('#scVoice').addEventListener('change', e => { cfg.voice = e.target.checked; save(); if (cfg.voice) say('음성 안내를 켰어요'); });
+    $('#scVoice').addEventListener('change', e => {
+      cfg.voice = e.target.checked; save();
+      if (!cfg.voice) return;
+      if (!window.speechSynthesis) { $('#scVoiceSub').textContent = '이 브라우저는 음성을 지원하지 않아 소리 알림만 써요'; return; }
+      unlockAudio(); say('음성 안내를 켰어요');
+    });
     $('#scClockSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; cfg.clock = b.dataset.v; renderSetup(); save(); });
     $('#scStart').addEventListener('click', () => {
-      g = SC.create(cfg.players, { limit: cfg.limit, team: cfg.team }); undo = []; clk.ext = [];
+      unlockAudio();
+      g = SC.create(cfg.players, { limit: cfg.limit, team: cfg.team, step: cfg.type === '4b' ? 10 : 1 }); g.kind = cfg.type; undo = []; clk.ext = [];
+      g.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
       msg(''); keepAwake(true); render(); clockReset();
       say(`${who(0)} 차례`);
     });
@@ -2497,7 +2758,9 @@ if (typeof module !== 'undefined') module.exports = Core;
       const res = SC.result(g);
       msg(`경기 끝 · ${res}`); say(`경기 끝, ${res}`);
       const a = hist();
-      a.unshift({ d: Date.now(), n: g.players.map(p => p.name), t: g.players.map(p => p.target), s: g.players.map(p => p.score), i: g.players.map(p => p.inn), h: g.players.map(p => p.high), res });
+      const rec = { id: g.id || Date.now().toString(36), d: Date.now(), k: g.kind || '3c', n: g.players.map(p => p.name), t: g.players.map(p => p.target), s: g.players.map(p => p.score), i: g.players.map(p => p.inn), h: g.players.map(p => p.high), res };
+      a.unshift(rec);
+      if (hooks.onDone) hooks.onDone(rec);
       try { localStorage.setItem(HKEY, JSON.stringify(a.slice(0, 200))); } catch (e) { /* 무시 */ }
       keepAwake(false); render(); clockReset();
     }
@@ -2551,7 +2814,7 @@ if (typeof module !== 'undefined') module.exports = Core;
       $('#scSetup').hidden = !!g; $('#scGame').hidden = !g;
       if (!g) { renderSetup(); renderHist(); save(); return; }
       const solo = g.players.length === 1;
-      $('#scTitle').textContent = solo ? '혼자 연습' : g.team ? `${g.players.length}팀 팀전` : `${g.players.length}인 경기`;
+      $('#scTitle').textContent = (g.kind === '4b' ? '4구 · ' : '') + (solo ? '혼자 연습' : g.team ? `${g.players.length}팀 팀전` : `${g.players.length}인 경기`);
       const cur = g.players[g.turn];
       $('#scInfo').textContent = g.done ? '경기 끝' : `${g.round}이닝${g.limit ? ` / ${g.limit}` : ''} · ${who(g.turn)} 차례`;
       const st = g.done ? SC.standings(g) : null;
@@ -2566,10 +2829,12 @@ if (typeof module !== 'undefined') module.exports = Core;
         </div>`;
       }).join('');
       const bs = $('#scBoard').querySelectorAll('.sc-score b');
-      g.players.forEach((p, i) => { if (prevScores[i] != null && p.score > prevScores[i] && bs[i]) bs[i].classList.add('bump'); });
+      const cards = $('#scBoard').querySelectorAll('.sc-p');
+      g.players.forEach((p, i) => { if (prevScores[i] != null && p.score > prevScores[i] && bs[i]) { bs[i].classList.add('bump'); cards[i].classList.add('flash'); } });
       prevScores = g.players.map(p => p.score);
       $('#scHit').disabled = $('#scMiss').disabled = g.done;
       $('#scMiss').textContent = solo ? '공타 · 다음 이닝' : '공타 · 차례 넘기기';
+      $('#scHit').textContent = `+${g.step || 1} 득점`;
       $('#scUndo').disabled = !undo.length;
       // 이닝별 득점표
       const R = Math.max(...g.players.map(p => p.log.length));
@@ -2583,48 +2848,86 @@ if (typeof module !== 'undefined') module.exports = Core;
       });
       $('#scLog').innerHTML = h + '</table>';
       renderHist(); save();
+      if (hooks.onLive && cfg.live) hooks.onLive(g);
     }
     function renderHist() {
       const a = hist();
-      const fmt = d => { const x = new Date(d); return `${x.getMonth() + 1}/${x.getDate()}`; };
-      $('#scHist').innerHTML = a.length ? `<table class="list"><tr><th>날짜</th><th>선수 · 점수</th><th class="r">이닝</th><th>결과</th></tr>${a.slice(0, 20).map(r =>
-        `<tr><td>${fmt(r.d)}</td><td>${r.n.map((n, i) => `${esc(n)} <span class="num">${r.s[i]}/${r.t[i]}</span>`).join(' · ')}</td><td class="r num">${Math.max(...r.i)}</td><td>${esc(r.res)}</td></tr>`).join('')}</table>`
-        : '<p class="sub" style="margin:0">끝난 경기가 여기에 쌓여요.</p>';
-      const by = new Map();
-      for (const r of a) r.n.forEach((k, i) => {
-        const o = by.get(k) || { g: 0, s: 0, i: 0, h: 0, w: 0, recent: [] };
-        o.g++; o.s += r.s[i]; o.i += r.i[i]; o.h = Math.max(o.h, r.h[i]);
-        if (r.n.length > 1 && typeof r.res === 'string' && r.res === `${k} 승`) o.w++;
-        if (o.recent.length < 10) o.recent.push([r.s[i], r.i[i]]);
-        by.set(k, o);
-      });
-      const rows = [...by.entries()].sort((x, y) => y[1].g - x[1].g);
-      // 1:1 상대 전적
-      const h2h = new Map();
-      for (const r of a) if (r.n.length === 2 && r.n[0] !== r.n[1]) {
-        const [x, y] = [...r.n].sort(), key = x + '\u0000' + y, o = h2h.get(key) || { x, y, wx: 0, wy: 0, d: 0 };
-        if (r.res === `${x} 승`) o.wx++; else if (r.res === `${y} 승`) o.wy++; else o.d++;
-        h2h.set(key, o);
-      }
-      const h2hHtml = h2h.size ? `<span class="lbl">상대 전적</span><table class="list"><tr><th>대결</th><th class="r">승-무-패</th></tr>${[...h2h.values()].map(o => `<tr><td>${esc(o.x)} vs ${esc(o.y)}</td><td class="r num">${o.wx}-${o.d}-${o.wy}</td></tr>`).join('')}</table>` : '';
-      const av = (sc, inn) => inn > 0 ? (sc / inn).toFixed(3) : '0.000';
-      $('#scMine').innerHTML = rows.length ? `<table class="list"><tr><th>이름</th><th class="r">경기</th><th class="r">승</th><th class="r">전체 에버</th><th class="r">최근 10경기</th><th class="r">하이런</th></tr>${rows.map(([k, o]) => {
-        const rs = o.recent.reduce((q, v) => [q[0] + v[0], q[1] + v[1]], [0, 0]);
-        return `<tr><td>${esc(k)}</td><td class="r num">${o.g}</td><td class="r num">${o.w}</td><td class="r num">${av(o.s, o.i)}</td><td class="r num">${av(rs[0], rs[1])}</td><td class="r num">${o.h}</td></tr>`;
-      }).join('')}</table>${h2hHtml}` : '<p class="sub" style="margin:0">경기를 끝내면 이름별 에버리지와 하이런이 정리돼요.</p>';
+      $('#scHist').innerHTML = histHtml(a, '끝난 경기가 여기에 쌓여요.');
+      $('#scMine').innerHTML = statsHtml(a, '경기를 끝내면 이름별 에버리지와 하이런이 정리돼요.');
     }
+    // 백업: 파일 저장(뷰어가 허락하면) → 안 되면 복사 → 그래도 안 되면 화면에 표시
+    async function exportBackup() {
+      const data = JSON.stringify({ app: 'cue3', v: 1, at: Date.now(), history: hist(), roster: roster() });
+      const d = new Date(), name = `3쿠션-기록-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.json`;
+      let dl = null;
+      try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
+      if (dl) {
+        try { const r = await dl.save({ filename: name, data }); if (r && r.status === 'saved') toast('백업 파일을 저장했어요.', 'info'); return; }
+        catch (e) { if (e && e.code === 'cancelled') return; }
+      }
+      try { await navigator.clipboard.writeText(data); toast('파일 저장을 쓸 수 없어 백업 내용을 복사했어요. 메모장에 붙여 넣어 .json으로 저장하세요.', 'info'); }
+      catch (e) { msg('아래 내용을 길게 눌러 복사해 두세요:\n' + data); }
+    }
+    $('#scExport').addEventListener('click', exportBackup);
+    $('#scImport').addEventListener('change', async e => {
+      const f = e.target.files && e.target.files[0]; if (!f) return;
+      try {
+        const v = JSON.parse(await f.text());
+        if (!v || v.app !== 'cue3' || !Array.isArray(v.history)) throw new Error('format');
+        const a = hist(), seen = new Set(a.map(r => r.d + '|' + r.n.join(',')));
+        let n = 0;
+        for (const r of v.history) if (r && Array.isArray(r.n) && Array.isArray(r.s) && !seen.has(r.d + '|' + r.n.join(','))) { a.push(r); n++; }
+        a.sort((x, y) => y.d - x.d);
+        localStorage.setItem(HKEY, JSON.stringify(a.slice(0, 500)));
+        if (Array.isArray(v.roster)) { const ro = roster(); for (const r of v.roster) if (r && r.name && !ro.find(x => x.name === r.name)) ro.push(r); storeRoster(ro); }
+        renderHist(); renderSetup();
+        toast(`경기 ${n}개를 불러왔어요.`, 'info');
+      } catch (err) { toast('3쿠션 길잡이 백업 파일이 아니에요. 기록 백업 저장으로 만든 파일을 골라 주세요.', 'warn'); }
+      e.target.value = '';
+    });
     $('#scClear').addEventListener('click', e => {
       const b = e.currentTarget;
       if (b.dataset.armed) { try { localStorage.removeItem(HKEY); } catch (err) { /* 무시 */ } delete b.dataset.armed; b.textContent = '기록 지우기'; renderHist(); return; }
       b.dataset.armed = '1'; b.textContent = '한 번 더 누르면 지워요';
       setTimeout(() => { delete b.dataset.armed; b.textContent = '기록 지우기'; }, 3000);
     });
+    // 리모컨 버튼 지정: 어떤 리모컨이든 그 리모컨이 보내는 키를 직접 배움
+    const KKEY = 'cue3-keys', ACT = [['hit', '득점'], ['miss', '공타'], ['undo', '되돌리기']];
+    let keymap = { hit: [], miss: [], undo: [] };
+    try { const v = JSON.parse(localStorage.getItem(KKEY) || 'null'); if (v && v.hit) keymap = v; } catch (e) { /* 없음 */ }
+    const keyName = k => ({ ' ': 'Space', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', AudioVolumeUp: '볼륨+', AudioVolumeDown: '볼륨−', MediaPlayPause: '재생' }[k] || k);
+    function renderKeyInfo() {
+      const custom = ACT.filter(([a]) => keymap[a] && keymap[a].length).map(([a, l]) => `${l} ${keymap[a].map(keyName).join('/')}`);
+      $('#scKeyInfo').textContent = custom.length ? `지정됨: ${custom.join(' · ')} (기본 키도 함께 동작)` : '기본: Space·↑ 득점, Enter·↓ 공타, ← 되돌리기';
+    }
+    let learn = -1;
+    function learnStep() {
+      if (learn < 0 || learn >= ACT.length) { learn = -1; $('#scKeyPanel').hidden = true; renderKeyInfo(); return; }
+      $('#scKeyPanel').hidden = false;
+      $('#scKeyStep').textContent = `${learn + 1}/3 · '${ACT[learn][1]}'에 쓸 리모컨 버튼을 한 번 누르세요`;
+    }
+    $('#scKeyLearn').addEventListener('click', () => { learn = 0; keymap = { hit: [], miss: [], undo: [] }; learnStep(); $('#scKeyLearn').blur(); });
+    $('#scKeySkip').addEventListener('click', () => { learn++; learnStep(); });
+    $('#scKeyDone').addEventListener('click', () => { learn = -1; learnStep(); });
+    $('#scKeyReset').addEventListener('click', () => { keymap = { hit: [], miss: [], undo: [] }; try { localStorage.removeItem(KKEY); } catch (e) { /* 무시 */ } learn = -1; learnStep(); });
+    document.addEventListener('keydown', e => {
+      if (learn < 0) return;
+      if (['Shift', 'Control', 'Alt', 'Meta', 'Tab', 'Escape'].includes(e.key)) { if (e.key === 'Escape') { learn = -1; learnStep(); } return; }
+      e.preventDefault(); e.stopImmediatePropagation();
+      for (const [a] of ACT) keymap[a] = (keymap[a] || []).filter(k => k !== e.key);
+      keymap[ACT[learn][0]].push(e.key);
+      try { localStorage.setItem(KKEY, JSON.stringify(keymap)); } catch (err) { /* 무시 */ }
+      toast(`'${ACT[learn][1]}' = ${keyName(e.key)}`, 'info');
+      learn++; learnStep();
+    }, true);
     // 키보드 · 블루투스 리모컨(페이지 넘김 버튼은 화살표 키를 보냄)
     document.addEventListener('keydown', e => {
-      if ($('#tabScore').hidden || !g || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (learn >= 0 || $('#tabScore').hidden || !g || e.altKey || e.ctrlKey || e.metaKey) return;
       const tg = e.target; if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.isContentEditable)) return;
       const k = e.key;
       let id = null;
+      const custom = ACT.find(([a]) => (keymap[a] || []).includes(k));
+      if (custom) { e.preventDefault(); $({ hit: '#scHit', miss: '#scMiss', undo: '#scUndo' }[custom[0]]).click(); return; }
       if (k === ' ' || k === 'ArrowUp' || k === 'PageUp') id = '#scHit';
       else if (k === 'Enter' || k === 'ArrowDown' || k === 'PageDown' || k === 'ArrowRight') id = '#scMiss';
       else if (k === 'ArrowLeft' || k === 'Backspace' || k === 'z' || k === 'Z') id = '#scUndo';
@@ -2634,6 +2937,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     });
     if (g && g.done) msg(`지난 경기 결과 · ${SC.result(g)}`);
     return {
+      localHistory: () => hist(),
       render: () => { render(); if (g && !g.done && +cfg.clock && !clk.timer) clockReset(); },
       leave: () => { setFocus(false); clearInterval(clk.timer); clk.timer = 0; }
     };
@@ -2659,6 +2963,145 @@ if (typeof module !== 'undefined') module.exports = Core;
     }
     $('#tipNone').hidden = any;
   });
+
+  // ---------- 클럽 기록 · 실시간 중계 (공유 저장소) ----------
+  const Club = (() => {
+    let db = null, canWrite = false, myId = null, games = [], lives = [], watchId = null;
+    let liveBusy = false, livePending = null;
+    const GAMES = 'club/main/games', LIVE = 'club/main/live';
+    const status = t => { $('#clubStatus').textContent = t; };
+    function render() {
+      $('#clubStats').innerHTML = statsHtml(games, '아직 클럽 기록이 없어요. 경기를 끝내면 여기에 모여요.');
+      $('#clubHist').innerHTML = histHtml(games, '아직 없어요.');
+    }
+    function liveFresh() { const now = Date.now(); return lives.filter(l => now - (l.u || 0) < (l.done ? 15 * 60e3 : 3 * 3600e3)); }
+    function renderLive() {
+      const ls = liveFresh();
+      $('#clubLive').innerHTML = ls.length ? `<span class="lbl">지금 진행 중</span><div class="col" style="gap:8px">${ls.map(l => `<div class="live-card"><div>${l.done ? '' : '<span class="live-dot" aria-hidden="true"></span>'}${l.players.map(p => `${esc(p.name)} <b class="num">${p.score}</b>`).join(' · ')} <span class="sub">${l.done ? '경기 끝' : `${l.round}이닝`}</span></div><button type="button" class="mini" data-watch="${esc(l.id)}">${watchId === l.id ? '닫기' : '보기'}</button></div>`).join('')}</div>` : '';
+      const w = ls.find(l => l.id === watchId);
+      $('#clubWatch').innerHTML = w ? `<div class="sc-board">${w.players.map((p, i) => `<div class="sc-p${!w.done && i === w.turn ? ' on' : ''}"><div class="pname"><span>${esc(p.name)}</span>${!w.done && i === w.turn ? '<span class="badge">차례</span>' : ''}</div><div class="sc-score"><b>${p.score}</b><span class="tgt">/ ${p.target}</span></div><div class="sc-stats"><span>이닝 <span class="num">${p.inn}</span></span><span>에버 <span class="num">${av3(p.score, p.inn)}</span></span><span>하이런 <span class="num">${p.high}</span></span></div></div>`).join('')}</div>${w.done ? `<p class="sub">${esc(w.res || '')}</p>` : ''}` : '';
+    }
+    $('#clubLive').addEventListener('click', e => { const b = e.target.closest('[data-watch]'); if (!b) return; watchId = watchId === b.dataset.watch ? null : b.dataset.watch; renderLive(); });
+    async function write(path, data) {
+      if (!db || !canWrite) return false;
+      try { await db.doc(path).set(data); return true; }
+      catch (e) {
+        if (e && e.code === 'unavailable') { await new Promise(r => setTimeout(r, 400 + Math.random() * 600)); try { await db.doc(path).set(data); return true; } catch (e2) { /* 아래 */ } }
+        if (e && (e.code === 'invalid_argument' || e.code === 'not_granted' || e.code === 'revoked')) { canWrite = false; applyWrite(); }
+        if (e && e.code === 'quota_exceeded') toast('클럽 기록 저장 공간이 가득 찼어요. 오래된 경기를 정리해야 해요.', 'warn');
+        return false;
+      }
+    }
+    function applyWrite() {
+      $('#clubWriteRow').hidden = !canWrite;
+      $('#scLiveRow').hidden = !canWrite;
+      status(canWrite ? '함께 쓰는 기록이에요' : '보기 전용: 기록 올리기는 이 링크의 참여자(Contributor) 이상만 할 수 있어요');
+    }
+    async function onDone(rec) {
+      if (!canWrite || !$('#clubAuto').checked) return;
+      const ok = await write(`${GAMES}/${rec.id}`, Object.assign({}, rec, { by: myId }));
+      if (ok) toast('클럽 기록에 올렸어요.', 'info');
+    }
+    async function onLive(g) {
+      const body = { u: Date.now(), by: myId, k: g.kind || '3c', done: g.done, round: g.round, turn: g.turn, res: g.done ? Core.score.result(g) : '',
+        players: g.players.map(p => ({ name: p.name, target: p.target, score: p.score, inn: p.inn, high: p.high })) };
+      if (liveBusy) { livePending = [g.id, body]; return; }
+      liveBusy = true;
+      let job = [g.id, body];
+      while (job) { await write(`${LIVE}/${job[0]}`, job[1]); job = livePending; livePending = null; }
+      liveBusy = false;
+    }
+    $('#clubUpAll').addEventListener('click', async e => {
+      const b = e.currentTarget; b.disabled = true;
+      const have = new Set(games.map(r => r.id));
+      let n = 0;
+      for (const r of Score.localHistory().slice(0, 200)) {
+        const id = r.id || `${r.d.toString(36)}-${r.n.join('-').replace(/[^0-9A-Za-z가-힣_-]/g, '').slice(0, 40) || 'x'}`;
+        if (have.has(id)) continue;
+        if (await write(`${GAMES}/${id}`, Object.assign({}, r, { id, by: myId }))) n++;
+      }
+      b.disabled = false;
+      toast(n ? `경기 ${n}개를 클럽 기록에 올렸어요.` : '올릴 새 경기가 없어요.', 'info');
+    });
+    (async () => {
+      try { db = window.claude && window.claude.use ? await window.claude.use('db') : null; } catch (e) { db = null; }
+      if (!db) return;
+      let user = null;
+      try { user = await window.claude.use('user'); } catch (e) { user = null; }
+      const cw = user ? await user.can('data.write') : null;
+      canWrite = cw !== false;
+      myId = user ? await user.id() : null;
+      $('#clubPanel').hidden = false; applyWrite(); render();
+      db.collection(GAMES).orderBy('d', 'desc').limit(300).onSnapshot(sn => {
+        games = sn.docs.map(d => d.data()).filter(r => r && Array.isArray(r.n) && Array.isArray(r.s) && Array.isArray(r.i) && Array.isArray(r.t) && Array.isArray(r.h));
+        render();
+      }, () => status('클럽 기록을 불러오지 못했어요. 새로 고침해 주세요.'));
+      db.collection(LIVE).orderBy('u', 'desc').limit(20).onSnapshot(sn => {
+        lives = sn.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(l => Array.isArray(l.players));
+        renderLive();
+      }, () => {});
+      setInterval(renderLive, 60e3);
+      hooks.onDone = onDone; hooks.onLive = onLive;
+    })();
+    return {};
+  })();
+
+  // ---------- Claude 도움: 사진 속 공 찾기 · 길 설명 ----------
+  const Ai = { sample: null, images: false };
+  function aiOff(e) { if (e && ['not_granted', 'sampling_disabled', 'not_declared', 'capability_disabled', 'capability_removed'].includes(e.code)) { Ai.sample = null; updateAi(); return true; } return false; }
+  function aiErr(e) {
+    if (aiOff(e) || (e && e.code === 'cancelled')) return '';
+    if (e && e.code === 'rate_limited') return '지금은 Claude 사용 한도에 걸렸어요. 잠시 뒤 다시 눌러 주세요.';
+    if (e && e.code === 'images_unavailable') { Ai.images = false; updateAi(); return '이 화면에서는 사진을 Claude에게 보낼 수 없어요.'; }
+    return 'Claude 응답을 받지 못했어요. 다시 눌러 주세요.';
+  }
+  function updateAi() {
+    $('#aiRow').hidden = !(Ai.sample && Ai.images && state.source === 'photo' && state.warped && state.view === 'table');
+    const miss = state.detect ? ['white', 'yellow', 'red'].filter(k => !state.detect[k]).length : 0;
+    $('#aiRowText').textContent = miss ? `사진에서 공 ${miss}개를 못 찾았어요. Claude가 사진을 보고 찾아 줄 수 있어요.` : '공 위치가 어긋나 보이면 Claude가 사진을 다시 보고 찾아 줄 수 있어요.';
+    const c = $('#btnCoach'); if (c) c.hidden = !Ai.sample;
+  }
+  $('#btnAiBalls').addEventListener('click', async e => {
+    const b = e.currentTarget; if (!Ai.sample || !state.warped) return;
+    b.disabled = true; b.textContent = 'Claude가 보는 중…';
+    try {
+      const cv = state.warped, W = cv.width, H = cv.height;
+      const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.9));
+      const ans = await Ai.sample.json(`이 이미지는 3쿠션 당구대의 플레이 면을 위에서 똑바로 펴 놓은 사진이야. 가로 ${W}px, 세로 ${H}px이고 이미지 테두리가 쿠션 끝선이야. 흰 공, 노란 공, 빨간 공 각각의 중심을 픽셀 좌표로 찾아 줘. 확실히 안 보이는 공은 null로 둬. 다른 말 없이 JSON 하나만: {"white":{"x":123,"y":45},"yellow":{"x":0,"y":0},"red":null}`, { images: [blob] });
+      const t = T(), found = [], nb = JSON.parse(JSON.stringify(state.balls)), det = Object.assign({}, state.detect || {});
+      for (const k of ['white', 'yellow', 'red']) {
+        const p = ans && ans[k];
+        if (p && isFinite(p.x) && isFinite(p.y) && p.x >= 0 && p.x <= W && p.y >= 0 && p.y <= H) { nb[k] = { x: p.x / W * t.W, y: p.y / H * t.H }; found.push(BALLNAME[k]); det[k] = true; }
+      }
+      if (found.length) { setBalls(nb, 'photo'); state.detect = det; renderStatus(); toast(`Claude가 ${found.join(', ')}을(를) 찾았어요. 어긋나면 끌어서 고쳐 주세요.`, 'info'); }
+      else toast('Claude도 공을 찾지 못했어요. 당구대 그림에서 공을 끌어 놓아 주세요.', 'warn');
+    } catch (err) { const m = aiErr(err); if (m) toast(m, 'warn'); }
+    b.disabled = false; b.textContent = 'Claude로 공 찾기'; updateAi();
+  });
+  async function coach() {
+    const s = state.sols[state.sel]; if (!s || !Ai.sample) return;
+    const out = $('#coachOut'), btn = $('#btnCoach'); if (!out) return;
+    const t = T(), pt = b => `장쿠션 ${(b.x / (t.W / 8)).toFixed(1)}, 단쿠션 ${(b.y / (t.H / 4)).toFixed(1)}`;
+    const rn = routeName(s.rec);
+    const facts = [
+      `테이블: ${t.name} (${t.W}m x ${t.H}m). 포인트는 화면 기준 장쿠션 왼쪽 0~오른쪽 8, 단쿠션 위 0~아래 4.`,
+      `수구(${BALLNAME[state.myBall]}) 위치: ${pt(state.balls[state.myBall])}. 빨간공: ${pt(state.balls.red)}. ${BALLNAME[otherKey()]}: ${pt(state.balls[otherKey()])}.`,
+      `추천 길: ${rn.name} (${rn.seq}). 순서: ${s.rec.evs.map(e => e.type === 'c' ? `${RAILNAME[e.rail]}쿠션 ${railPoint(e)}` : BALLNAME[objKey(e.idx)]).join(' → ')}.`,
+      `겨냥: ${aimText(s.rec)}. 당점: ${tipText(s.E, s.vk)}. 힘: ${s.pw.lv}단계(${s.pw.label}), 수구 초속 약 ${s.V0.toFixed(1)}m/s. 허용 오차 ±${s.tolMM.toFixed(0)}mm.`,
+      `위험: ${s.risk.kiss ? '키스 가능' : ''} ${s.risk.objHit ? '적구끼리 충돌 가능' : ''}`.trim()
+    ].join('\n');
+    btn.disabled = true; out.hidden = false; out.textContent = 'Claude가 생각하는 중…';
+    try {
+      await Ai.sample(`너는 한국 3쿠션 당구 코치야. 아래는 계산기가 찾은 득점 길이야. 동호인에게 말하듯 한국어로 5~7줄 이내로 설명해 줘: 1) 이 길을 고르는 이유, 2) 겨냥과 두께 잡는 요령, 3) 당점·스트로크·힘 요령, 4) 흔한 실수와 피하는 법. 계산 결과에 없는 숫자를 지어내지 말고, 머리말·마크다운 없이 짧은 문장으로.\n\n${facts}`, { onText: ({ text }) => { out.textContent = text; } });
+    } catch (err) { const m = aiErr(err); out.textContent = (err && err.text) || ''; if (m) toast(m, 'warn'); if (!out.textContent) out.hidden = true; }
+    btn.disabled = false;
+  }
+  (async () => {
+    try { Ai.sample = window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { Ai.sample = null; }
+    if (!Ai.sample) return;
+    try { const lim = await Ai.sample.limits(); Ai.images = !!(lim && lim.images); } catch (e) { Ai.images = false; }
+    updateAi(); renderRec();
+  })();
 
   // ---------- 화면 밝기 ----------
   const THEMES = ['system', 'light', 'dark'];

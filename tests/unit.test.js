@@ -254,3 +254,36 @@ test('팀전: 팀원이 이닝마다 번갈아 침', () => {
 });
 test('팀전: 개인전에서는 칠 사람 = 이름', () => { const g = SC.create(P(3, 3)); assert.equal(SC.shooter(g.players[1]), 'P1'); });
 test('팀전: 팀원 이름이 없으면 팀 이름', () => { const g = SC.create([{ name: '', target: 3 }], { team: true }); assert.equal(SC.shooter(g.players[0]), '선수 1'); });
+
+// ---------- 시스템 표 · 4구 ----------
+test('시스템 표: 17칸(반 포인트), 위 장쿠션 겨냥은 1쿠션이 위', () => {
+  const rows = Engine.sysTable({ table: 'daedae', cue: { x: 2.7, y: 1.3 }, objs: [{ x: 1, y: 1 }, { x: 2, y: 0.5 }] }, { rail: 2 });
+  assert.equal(rows.length, 17);
+  assert.ok(rows.filter(r => r.ok).length >= 5);
+  for (const r of rows.filter(r => r.ok)) assert.ok(r.third.pt >= -0.01 && r.third.pt <= 8.01);
+});
+test('시스템 표: 코너(50)에서 1쿠션 3포인트 → 3쿠션 약 2포인트 (파이브앤하프 기준 샷)', () => {
+  const rows = Engine.sysTable({ table: 'daedae', cue: { x: 2.75, y: 1.33 }, objs: [{ x: 1, y: 1 }, { x: 2, y: 0.5 }] }, { rail: 2, E: 2, auto: true });
+  const r = rows.find(x => x.aim === 3);
+  assert.ok(r.E < 0, '오른쪽 아래 코너에서 위 장쿠션 왼쪽을 겨냥하면 순회전은 왼쪽 당점');
+  assert.ok(r.ok && r.third.rail === 0 && r.third.pt > 1.4 && r.third.pt < 2.6, JSON.stringify(r.third));
+  const run = rows.filter(x => x.ok && x.third.rail === 0 && x.aim >= 1.5 && x.aim <= 3.5);
+  for (let i = 1; i < run.length; i++) assert.ok(run[i].third.pt < run[i - 1].third.pt, 'monotonic');
+});
+test('시스템 표: 적구는 무시됨 (적구가 길을 막아도 쿠션 길)', () => {
+  const rows = Engine.sysTable({ table: 'daedae', cue: { x: 1.4, y: 0.4 }, objs: [{ x: 1.4, y: 0.8 }, { x: 1.4, y: 1.1 }] }, { rail: 2 });
+  assert.ok(rows[8].path.length >= 3);
+});
+test('4구: 한 번 득점에 10점, 목표에서 멈춤', () => {
+  const g = SC.create([{ name: 'a', target: 30 }, { name: 'b', target: 30 }], { step: 10 });
+  play(g, 'hh'); assert.equal(g.players[0].score, 20); assert.equal(g.players[0].high, 20);
+  play(g, 'h'); assert.equal(g.players[0].score, 30); assert.equal(g.turn, 1);
+});
+test('4구: 목표 범위 5000까지', () => { const g = SC.create([{ name: 'a', target: 3000 }], { step: 10 }); assert.equal(g.players[0].target, 3000); });
+
+test('시스템 표: 순회전은 겨냥 방향에 따라 당점 좌우가 바뀜', () => {
+  const rows = Engine.sysTable({ table: 'daedae', cue: { x: 1.4, y: 1.0 }, objs: [{ x: 1, y: 1 }, { x: 2, y: 0.5 }] }, { rail: 2, E: 2, auto: true });
+  assert.ok(rows[2].E < 0 && rows[14].E > 0);
+  const flip = Engine.sysTable({ table: 'daedae', cue: { x: 1.4, y: 1.0 }, objs: [{ x: 1, y: 1 }, { x: 2, y: 0.5 }] }, { rail: 2, E: 2, auto: true, flip: true });
+  assert.ok(flip[2].E > 0 && flip[14].E < 0);
+});

@@ -222,3 +222,167 @@ test('E2E 22: 추천 길 칩에 길 그림, 조준해 보기로 직접 조준', 
   await p.click('#btnTryAim'); assert.equal(await p.isVisible('#aimPanel'), true);
   noErr(p); await p.context().close();
 });
+
+// ---------- 플랫폼 기능 흉내(window.claude) ----------
+const MOCK = `(() => {
+  const store = new Map(), subs = [];
+  const snapDoc = (path) => ({ id: path.split('/').pop(), exists: store.has(path), data: () => store.get(path), metadata: { fromCache: false, hasPendingWrites: false } });
+  const notify = () => subs.forEach(s => s.fire());
+  const query = (coll, ord, lim) => ({
+    orderBy: (f, d) => query(coll, [f, d || 'asc'], lim), limit: n => query(coll, ord, n), where: () => query(coll, ord, lim),
+    get: async () => build(coll, ord, lim),
+    onSnapshot(next) { const s = { fire: () => next(build(coll, ord, lim)) }; subs.push(s); setTimeout(s.fire, 0); return () => subs.splice(subs.indexOf(s), 1); }
+  });
+  function build(coll, ord, lim) {
+    let docs = [...store.keys()].filter(k => k.startsWith(coll + '/') && k.split('/').length === coll.split('/').length + 1).map(snapDoc);
+    if (ord) docs.sort((a, b) => (a.data()[ord[0]] > b.data()[ord[0]] ? 1 : -1) * (ord[1] === 'desc' ? -1 : 1));
+    if (lim) docs = docs.slice(0, lim);
+    return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: {} };
+  }
+  const doc = path => ({ id: path.split('/').pop(), path, get: async () => snapDoc(path),
+    set: async d => { store.set(path, JSON.parse(JSON.stringify(d))); window.__writes = (window.__writes || 0) + 1; notify(); },
+    update: async d => { store.set(path, Object.assign({}, store.get(path), d)); notify(); }, delete: async () => { store.delete(path); notify(); },
+    onSnapshot(next) { const s = { fire: () => next(snapDoc(path)) }; subs.push(s); setTimeout(s.fire, 0); return () => {}; } });
+  const db = { doc, collection: p => Object.assign(query(p), { path: p, doc: id => doc(p + '/' + (id || Math.random().toString(36).slice(2))) }) };
+  const sample = async (input, o) => { window.__prompt = input; const t = '이 길은 두께가 넉넉해서 안전해요.'; o && o.onText && o.onText({ text: t, delta: t }); return { text: t, truncated: false }; };
+  sample.json = async (input, o) => { window.__jsonImages = o && o.images && o.images.length; return { white: { x: 225, y: 150 }, yellow: { x: 675, y: 300 }, red: { x: 450, y: 225 } }; };
+  sample.limits = async () => ({ maxPromptBytes: 262144, images: { maxCount: 4, maxInputBytes: 2e7, mediaTypes: ['image/jpeg'] } });
+  const user = { can: async () => true, id: async () => 'u_test', isOwner: async () => true, canEdit: async () => true };
+  const downloads = { save: async r => { window.__saved = r; return { status: 'saved' }; } };
+  const caps = { db, sample, user, downloads };
+  window.claude = { use: async n => { await new Promise(r => setTimeout(r, 20)); return caps[n] || null; } };
+})();`;
+async function openMock(opts = {}) {
+  const ctx = await browser.newContext({ viewport: { width: opts.w || 400, height: opts.h || 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  await ctx.addInitScript(MOCK);
+  const p = await ctx.newPage();
+  p.errors = []; p.on('pageerror', e => p.errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') p.errors.push(m.text()); });
+  await p.goto('file://' + page + (opts.hash || ''));
+  if (!opts.noWait) await p.waitForSelector('.chip', { timeout: 30000 });
+  return p;
+}
+
+test('E2E 23: 시스템 표 — 17줄, 줄 고르기, 수구 끌면 표가 바뀜', async () => {
+  const p = await open();
+  await p.click('#mSys');
+  assert.equal(await p.$$eval('#sysTable tr[data-k]', r => r.length), 17);
+  await p.click('#sysTable tr[data-k="4"]');
+  assert.equal(await p.getAttribute('#sysTable tr[data-k="4"]', 'aria-selected'), 'true');
+  const before = await p.textContent('#sysTable');
+  const vis = await p.$eval('#cvTable', c => { const r = c.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; });
+  assert.ok(vis, '표를 눌러도 당구대가 화면에 보여야 함');
+  const box = await p.$eval('#cvTable', c => { const r = c.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width }; });
+  const s = box.w / (2.844 + 0.3), bx = box.x + (0.15 + 0.75) * s, by = box.y + (0.15 + 0.95) * s;
+  await p.mouse.move(bx, by); await p.mouse.down(); await p.mouse.move(bx + 120, by - 40, { steps: 6 }); await p.mouse.up();
+  assert.notEqual(await p.textContent('#sysTable'), before);
+  await p.click('#sysTip [data-v="3"]'); assert.match(await p.textContent('#sysNote'), /3팁/);
+  noErr(p); await p.context().close();
+});
+test('E2E 24: 4구 — 목표 200, 한 번 득점에 10점', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  await p.click('#scType [data-v="4b"]');
+  assert.equal(await p.inputValue('#scPlayers input[data-k="target"]'), '200');
+  await p.click('#scStart'); assert.equal(await p.textContent('#scHit'), '+10 득점');
+  await p.click('#scHit'); await p.click('#scHit');
+  assert.equal(await p.$eval('.sc-score b', b => b.textContent), '20');
+  assert.match(await p.textContent('#scTitle'), /4구/);
+  noErr(p); await p.context().close();
+});
+test('E2E 25: 선수 명단 — 저장한 이름을 고르면 점수(핸디)가 자동 입력', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  const n = await p.$$('#scPlayers input[data-k="name"]'), t = await p.$$('#scPlayers input[data-k="target"]');
+  await n[0].fill('김철수'); await t[0].fill('28'); await n[1].fill('이영희'); await t[1].fill('15');
+  await p.click('#scRosterSave');
+  await p.click('#scPlus');
+  const n3 = (await p.$$('#scPlayers input[data-k="name"]'))[2];
+  await n3.fill('이영희');
+  assert.equal(await (await p.$$('#scPlayers input[data-k="target"]'))[2].inputValue(), '15');
+  await p.click('#scRosterBox summary'); assert.match(await p.textContent('#scRoster'), /김철수/);
+  noErr(p); await p.context().close();
+});
+test('E2E 26: 리모컨 버튼 지정 — 아무 키나 득점/공타/되돌리기로', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  await p.click('#scKeyLearn');
+  await p.keyboard.press('k'); await p.keyboard.press('j'); await p.keyboard.press('u');
+  assert.equal(await p.isVisible('#scKeyPanel'), false);
+  assert.match(await p.textContent('#scKeyInfo'), /득점 k/);
+  await p.click('#scStart');
+  await p.keyboard.press('k'); await p.keyboard.press('k'); await p.keyboard.press('u'); await p.keyboard.press('j');
+  assert.deepEqual(await p.$$eval('.sc-score b', e => e.map(x => x.textContent)), ['1', '0']);
+  assert.match(await p.textContent('#scInfo'), /선수 B 차례/);
+  noErr(p); await p.context().close();
+});
+test('E2E 27: 기록 백업 저장 → 다른 기기에서 불러오기', async () => {
+  const p = await openMock({ hash: '#score', noWait: true });
+  const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('1'); await t[1].fill('1');
+  await p.click('#scStart'); await p.click('#scMiss'); await p.click('#scHit');
+  await p.click('#scExport'); await p.waitForFunction(() => window.__saved);
+  const saved = await p.evaluate(() => window.__saved);
+  assert.match(saved.filename, /^3쿠션-기록-\d{8}\.json$/);
+  await p.context().close();
+  const q = await open({ hash: '#score', noWait: true });
+  await q.setInputFiles('#scImport', { name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(saved.data) });
+  await q.waitForFunction(() => /선수 B/.test(document.querySelector('#scHist').textContent));
+  await q.setInputFiles('#scImport', { name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"hello":1}') });
+  assert.match(await q.textContent('#toast'), /백업 파일이 아니에요/);
+  noErr(q); await q.context().close();
+});
+test('E2E 28: 클럽 기록 — 경기 끝나면 공유 기록에 올라가고 실시간 중계가 보임', async () => {
+  const p = await openMock({ hash: '#score', noWait: true });
+  await p.waitForSelector('#clubPanel:not([hidden])');
+  assert.equal(await p.isVisible('#scLiveRow'), true);
+  await p.check('#scLive');
+  const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('2'); await t[1].fill('2');
+  await p.click('#scStart'); await p.click('#scHit');
+  await p.waitForSelector('#clubLive .live-card');
+  await p.click('#clubLive [data-watch]'); await p.waitForSelector('#clubWatch .sc-p');
+  await p.click('#scHit'); await p.click('#scMiss');
+  await p.waitForFunction(() => /선수 A/.test(document.querySelector('#clubStats').textContent));
+  assert.match(await p.textContent('#clubHist'), /선수 A 승/);
+  noErr(p); await p.context().close();
+});
+test('E2E 29: Claude 코치 설명 (흉내)', async () => {
+  const p = await openMock();
+  await p.waitForSelector('#btnCoach:not([hidden])');
+  await p.click('#btnCoach');
+  await p.waitForFunction(() => document.querySelector('#coachOut').textContent.includes('안전해요'));
+  const prompt = await p.evaluate(() => window.__prompt);
+  assert.match(prompt, /추천 길: /); assert.match(prompt, /당점: /);
+  noErr(p); await p.context().close();
+});
+test('E2E 30: 사진 올리기 → 펴기 → Claude로 공 찾기 (흉내)', async () => {
+  const p = await openMock();
+  const dataUrl = await p.evaluate(() => {
+    const c = document.createElement('canvas'); c.width = 1000; c.height = 600; const g = c.getContext('2d');
+    g.fillStyle = '#4a2f1e'; g.fillRect(0, 0, 1000, 600); g.fillStyle = '#2158b8'; g.fillRect(100, 100, 800, 400);
+    return c.toDataURL('image/png');
+  });
+  await p.setInputFiles('#fileIn', { name: 't.png', mimeType: 'image/png', buffer: Buffer.from(dataUrl.split(',')[1], 'base64') });
+  await p.waitForSelector('#viewCorner:not([hidden])');
+  await p.click('#btnConfirm');
+  await p.waitForSelector('#aiRow:not([hidden])');
+  assert.match(await p.textContent('#aiRowText'), /못 찾았어요/);
+  await p.click('#btnAiBalls');
+  await p.waitForFunction(() => /Claude가/.test(document.querySelector('#toast').textContent));
+  assert.equal(await p.evaluate(() => window.__jsonImages), 1);
+  // 흉내 응답(900×450 픽셀 좌표)이 테이블 미터 좌표로 정확히 바뀌었는지
+  assert.equal(await p.inputValue('#codeOut'), '3C-D-W-0711-0474-2133-0948-1422-0711');
+  const pills = await p.$$eval('#status .pill.miss', e => e.length); assert.equal(pills, 0);
+  noErr(p); await p.context().close();
+});
+test('E2E 31: 플랫폼 기능이 없으면 클럽·Claude 버튼은 숨김', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  await p.waitForTimeout(300);
+  assert.equal(await p.isVisible('#clubPanel'), false); assert.equal(await p.isVisible('#scLiveRow'), false);
+  await p.click('.tabs [data-tab="find"]'); await p.waitForSelector('.chip');
+  assert.equal(await p.isVisible('#btnCoach'), false); assert.equal(await p.isVisible('#aiRow'), false);
+  noErr(p); await p.context().close();
+});
+test('E2E 32: 가로로 눕힌 휴대폰 큰 화면 — 점수 왼쪽, 버튼 오른쪽', async () => {
+  const p = await open({ hash: '#score', noWait: true, w: 844 });
+  await p.setViewportSize({ width: 844, height: 390 });
+  await p.click('#scStart'); await p.click('#scBig');
+  const r = await p.evaluate(() => { const a = document.querySelector('#scBoard').getBoundingClientRect(), b = document.querySelector('#scHit').getBoundingClientRect(); return [a.left, a.right, b.left, b.top]; });
+  assert.ok(r[2] >= r[1] - 1, JSON.stringify(r));
+  noErr(p); await p.context().close();
+});
