@@ -1,0 +1,1768 @@
+<title>3쿠션 길잡이</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* 레이아웃: 휴대폰 한 손 조작용 단일 컬럼 — 위에 당구대, 아래에 공략 카드와 보정 */
+:root {
+  --bg: #edf1f6;
+  --surface: #ffffff;
+  --surface-2: #e3e9f1;
+  --ink: #13203a;
+  --muted: #56657d;
+  --line: #d2dae5;
+  --accent: #1b5ccc;
+  --accent-ink: #ffffff;
+  --accent-soft: #dbe6fa;
+  --brass: #c08f2c;
+  --cloth: #2158b8;
+  --cloth-deep: #17428f;
+  --rail: #4a2f1e;
+  --rail-hi: #6b4630;
+  --pearl: #efe6cf;
+  --ball-white: #f6f4ec;
+  --ball-yellow: #f0bd22;
+  --ball-red: #cf2430;
+  --path: #ffffff;
+  --path-edge: rgba(8, 18, 40, 0.55);
+  --good: #17805a;
+  --warn: #b26d0a;
+  --bad: #bf3434;
+  --f-display: "Black Han Sans", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --f-body: "IBM Plex Sans KR", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c131f; --surface: #131d2c; --surface-2: #1a2637; --ink: #e5ebf4; --muted: #93a2b8; --line: #263449;
+    --accent: #6ea6ff; --accent-ink: #0a1324; --accent-soft: #1b2c4a; --brass: #d8a94c;
+    --cloth: #1f53ad; --cloth-deep: #153a7c; --rail: #3d2617; --rail-hi: #5a3a26; --pearl: #e9dfc4;
+    --path: #ffffff; --path-edge: rgba(0, 0, 0, 0.6);
+    --good: #3cc48d; --warn: #e3a33d; --bad: #ef6b6b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c131f; --surface: #131d2c; --surface-2: #1a2637; --ink: #e5ebf4; --muted: #93a2b8; --line: #263449;
+  --accent: #6ea6ff; --accent-ink: #0a1324; --accent-soft: #1b2c4a; --brass: #d8a94c;
+  --cloth: #1f53ad; --cloth-deep: #153a7c; --rail: #3d2617; --rail-hi: #5a3a26; --pearl: #e9dfc4;
+  --path: #ffffff; --path-edge: rgba(0, 0, 0, 0.6);
+  --good: #3cc48d; --warn: #e3a33d; --bad: #ef6b6b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body);
+  font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 16px; padding-block: 12px 40px; display: flex; flex-direction: column; gap: 14px; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.brand h1 { font-family: var(--f-display); font-weight: 400; font-size: 26px; letter-spacing: 0.01em; margin: 0; line-height: 1.1; }
+.brand h1 b { color: var(--accent); font-weight: 400; }
+.brand span { color: var(--muted); font-size: 13px; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); padding: 9px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; min-height: 40px; white-space: nowrap; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn svg { width: 18px; height: 18px; flex: none; }
+.upload-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.upload { position: relative; display: inline-flex; border-radius: 999px; }
+.upload:focus-within .btn { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 실제 파일 입력을 버튼 위에 투명하게 덮어 손가락이 입력 요소를 직접 누르게 함 */
+.file-cover { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; z-index: 1; }
+.linkish { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+ol.help { margin: 0; padding-left: 20px; display: grid; gap: 12px; font-size: 14px; }
+ol.help li { padding-left: 2px; }
+ol.help li > b { display: block; margin-bottom: 3px; }
+ol.help li > span { display: block; color: var(--muted); font-size: 13px; }
+.native-file { display: block; max-width: 100%; margin-top: 4px; font-size: 14px; }
+.paste-box { margin-top: 8px; min-height: 52px; border: 1.5px dashed var(--line); border-radius: 10px; padding: 14px 12px; font-size: 13px; color: var(--muted); outline: none; }
+.paste-box:focus { border-color: var(--accent); }
+.paste-box:empty::before { content: "여기를 누르고 붙여넣기 (Ctrl+V)"; }
+body.dropping .wrap { outline: 2px dashed var(--accent); outline-offset: -6px; border-radius: 14px; }
+
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { white-space: nowrap; border: 0; background: transparent; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); min-height: 32px; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.status { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); font-weight: 600; font-size: 12px; color: var(--muted); }
+.pill .dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.25); }
+.pill.miss { color: var(--warn); }
+.pill.busy::after { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pill.busy::after { animation: none; } }
+
+.stage { position: relative; }
+.stage canvas { display: block; width: 100%; touch-action: none; border-radius: 10px; }
+.hint { margin: 0; font-size: 13px; color: var(--muted); }
+.stage-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.stage-foot .hint { flex: 1 1 220px; min-width: 0; }
+.stage-btns { display: flex; gap: 8px; }
+.btn.sm { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+.btn.sm svg { width: 15px; height: 15px; }
+.thick { display: flex; align-items: center; gap: 10px; }
+.thick svg { width: 72px; height: 34px; flex: none; }
+.hint b { color: var(--ink); font-weight: 600; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel h2 { margin: 0; font-size: 15px; font-weight: 700; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.chip { flex: none; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 11px; min-width: 112px; }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.chip .n { font-family: var(--f-num); font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.chip .t { font-weight: 700; font-size: 13.5px; }
+.chip .s { font-size: 12px; color: var(--muted); }
+.lvl { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.lvl.easy { background: var(--good); } .lvl.mid { background: var(--warn); } .lvl.hard { background: var(--bad); }
+
+.kv { width: 100%; border-collapse: collapse; font-size: 14px; }
+.kv th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12.5px; padding: 9px 10px 9px 0; vertical-align: top; width: 74px; white-space: nowrap; letter-spacing: 0.02em; }
+.kv td { padding: 8px 0; vertical-align: top; border-top: 1px solid var(--line); }
+.kv tr:first-child td, .kv tr:first-child th { border-top: 0; }
+.kv th { border-top: 1px solid var(--line); }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-size: 13px; }
+.route { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.route .step { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; background: var(--surface-2); font-size: 13px; font-weight: 600; }
+.route .step .k { font-family: var(--f-num); font-size: 11px; color: var(--brass); }
+.route .arr { color: var(--muted); font-size: 12px; }
+.tipcell { display: flex; align-items: center; gap: 10px; }
+.tipcell svg { width: 44px; height: 44px; flex: none; }
+.pips { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: 6px; }
+.pips i { width: 14px; height: 8px; border-radius: 2px; background: var(--surface-2); display: inline-block; }
+.pips i.on { background: var(--accent); }
+.tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
+.tag.good { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.tag.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.tag.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+.sub { color: var(--muted); font-size: 12.5px; }
+.empty { color: var(--muted); font-size: 14px; margin: 0; }
+
+.aim-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.tip-pick { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.tip-pick svg { width: 116px; height: 116px; touch-action: none; cursor: pointer; }
+.tip-pick .cap { font-size: 12.5px; font-weight: 600; }
+.aim-ctl { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 170px; }
+#powSeg { display: flex; width: 100%; }
+#powSeg button { flex: 1; padding: 6px 2px; }
+.nudge-row { display: flex; flex-direction: column; gap: 6px; }
+.lbl { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 0.02em; }
+.nudge { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto repeat(2, minmax(0, 1fr)); align-items: center; gap: 6px; }
+.nudge button { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 4px; font-size: 12.5px; font-family: var(--f-num); min-height: 36px; }
+.nudge .num { padding: 0 6px; min-width: 64px; text-align: center; font-size: 14px; font-weight: 500; }
+
+details.settings { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+details.settings summary { padding: 12px 14px; font-weight: 700; cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details.settings summary::-webkit-details-marker { display: none; }
+details.settings summary::after { content: "+"; font-family: var(--f-num); color: var(--muted); }
+details.settings[open] summary::after { content: "−"; }
+.set-body { padding: 0 14px 14px; display: grid; gap: 12px; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.set-row label { font-size: 14px; font-weight: 600; }
+.set-row .sub { display: block; font-weight: 400; }
+input[type="range"] { width: 170px; accent-color: var(--accent); }
+
+.corner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.note { font-size: 12.5px; color: var(--muted); margin: 0; max-width: 65ch; }
+.toast { font-size: 13px; padding: 9px 12px; border-radius: 10px; background: color-mix(in srgb, var(--warn) 14%, var(--surface)); color: var(--ink); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); margin: 0; }
+.toast.info { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+</style>
+
+<div class="wrap">
+  <header class="bar">
+    <div class="brand"><h1><b>3쿠션</b> 길잡이</h1><span>사진 한 장으로 길 보기</span></div>
+    <div class="upload-actions">
+      <div class="upload">
+        <span class="btn primary" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>갤러리에서 사진 고르기</span>
+        <input id="fileIn" class="file-cover" type="file" accept="image/*" aria-label="갤러리에서 사진 고르기">
+      </div>
+      <div class="upload">
+        <span class="btn" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>카메라</span>
+        <input id="camIn" class="file-cover" type="file" accept="image/*" capture="environment" aria-label="카메라로 찍기">
+      </div>
+    </div>
+  </header>
+  <button type="button" class="linkish" id="btnHelp">사진이 안 올라가요?</button>
+
+  <section id="uploadHelp" class="panel" hidden>
+    <div class="panel-head"><h2>사진이 안 열릴 때</h2><button type="button" class="btn" id="btnHelpClose">닫기</button></div>
+    <p class="hint" id="helpLead">Claude 앱 안의 화면에서는 갤럭시 등 안드로이드 폰에서 갤러리 창이 막혀 있을 수 있어요. 아래 방법을 차례로 써 보세요.</p>
+    <ol class="help">
+      <li><b>기본 파일 버튼으로 고르기</b><span>휴대폰 기본 모양의 버튼이에요. 위 버튼이 안 될 때 이쪽은 열리기도 해요.</span><input id="fileIn2" class="native-file" type="file" accept="image/*" aria-label="기본 파일 버튼으로 사진 고르기"></li>
+      <li id="helpBrowser"><b>삼성 인터넷·크롬에서 열기 (갤럭시 추천)</b><span>Claude 채팅에서 받은 HTML 파일을 내 파일 앱의 다운로드 폴더에서 눌러 삼성 인터넷이나 크롬으로 여세요. 로그인 없이 갤러리가 바로 열려요. 브라우저에서 claude.ai에 로그인한 뒤 이 페이지 링크를 열어도 돼요.</span></li>
+      <li><b>사진 없이 공 놓기</b><span>아래 당구대 그림에서 세 공을 끌어 실제 위치에 맞추면 바로 길을 계산해요.</span><button type="button" class="btn" id="btnManual" style="margin-top:6px">공 직접 놓으러 가기</button></li>
+      <li><b>복사해서 붙여넣기 (PC)</b><span>사진을 복사한 뒤 아래 칸을 누르고 붙여넣기 하세요. 사진 파일을 이 페이지로 끌어다 놓아도 돼요.</span><div id="pasteBox" class="paste-box" contenteditable="true" role="textbox" aria-label="사진 붙여넣기 칸"></div></li>
+    </ol>
+  </section>
+
+  <p class="toast" id="toast" hidden></p>
+
+  <!-- 코너 맞추기 -->
+  <section id="viewCorner" class="panel" hidden>
+    <div class="panel-head"><h2>1. 쿠션 끝선 맞추기</h2><span class="sub" id="cornerMsg"></span></div>
+    <p class="hint">네 점을 <b>쿠션 끝선(공이 닿는 선)의 꼭짓점</b>에 맞추세요. 점을 누른 채 끌면 확대경이 떠요.</p>
+    <div class="stage"><canvas id="cvPhoto" aria-label="테이블 사진과 모서리 조절점"></canvas></div>
+    <div class="corner-actions">
+      <button class="btn" id="btnAuto" type="button">자동으로 다시 찾기</button>
+      <button class="btn primary" id="btnConfirm" type="button">확정하고 공 찾기</button>
+      <button class="btn" id="btnBackTable" type="button">취소</button>
+    </div>
+  </section>
+
+  <!-- 당구대 & 공략 -->
+  <section id="viewTable" style="display:flex;flex-direction:column;gap:12px">
+    <div class="toolbar">
+      <div class="seg" role="group" aria-label="보기 방식">
+        <button type="button" id="mRec" aria-pressed="true">추천 공략</button>
+        <button type="button" id="mAim" aria-pressed="false">직접 조준</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+    <div class="stage"><canvas id="cvTable" aria-label="당구대 평면도와 공 경로"></canvas></div>
+    <div class="stage-foot">
+      <p class="hint" id="tableHint">공을 끌어서 위치를 고칠 수 있어요. 놓으면 길을 다시 계산합니다.</p>
+      <div class="stage-btns">
+        <button type="button" class="btn sm" id="btnUndo" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>되돌리기</button>
+        <button type="button" class="btn sm primary" id="btnPlay"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7z"/></svg><span>샷 보기</span></button>
+      </div>
+    </div>
+
+    <div id="recPanel" class="panel">
+      <div class="panel-head"><h2>추천 길</h2><span class="sub" id="recSub"></span></div>
+      <div class="chips" id="solChips" role="group" aria-label="추천 공략 목록"></div>
+      <div id="solDetail"></div>
+    </div>
+
+    <div id="aimPanel" class="panel" hidden>
+      <div class="panel-head"><h2>직접 조준</h2><span class="sub">당구대를 끌면 그 방향으로 겨냥</span></div>
+      <div class="aim-row">
+        <div class="tip-pick">
+          <svg id="tipSvg" viewBox="-62 -62 124 124" role="img" aria-label="당점 선택"></svg>
+          <div class="cap" id="tipCap"></div>
+        </div>
+        <div class="aim-ctl">
+          <span class="lbl">힘</span>
+          <div class="seg" id="powSeg" role="group" aria-label="힘 단계"></div>
+          <span class="sub">당점: 공 그림을 눌러 고르기. 1팁은 공 반지름의 약 1/6</span>
+        </div>
+      </div>
+      <div class="nudge-row">
+        <span class="lbl">미세 조준 (겨냥 각도)</span>
+        <div class="nudge">
+          <button type="button" data-d="-0.5" aria-label="0.5도 왼쪽">−0.5</button>
+          <button type="button" data-d="-0.1" aria-label="0.1도 왼쪽">−0.1</button>
+          <span class="num" id="angOut">0.0°</span>
+          <button type="button" data-d="0.1" aria-label="0.1도 오른쪽">+0.1</button>
+          <button type="button" data-d="0.5" aria-label="0.5도 오른쪽">+0.5</button>
+        </div>
+      </div>
+      <table class="kv" id="aimTable"></table>
+    </div>
+  </section>
+
+  <details class="settings" id="settings">
+    <summary>테이블 · 내 공 · 보정</summary>
+    <div class="set-body">
+      <div class="set-row"><label>테이블 크기<span class="sub">플레이 면 기준</span></label>
+        <div class="seg" id="segTable"><button type="button" data-v="daedae">대대 2844×1422</button><button type="button" data-v="jungdae">중대 2540×1270</button></div></div>
+      <div class="set-row"><label>내 공(수구)</label>
+        <div class="seg" id="segMy"><button type="button" data-v="white">흰공</button><button type="button" data-v="yellow">노란공</button></div></div>
+      <div class="set-row"><label for="spinIn">회전 효과 <span class="num" id="spinOut">×1.0</span><span class="sub">쿠션에서 회전이 덜 먹으면 낮추세요</span></label>
+        <input type="range" id="spinIn" min="0.6" max="1.4" step="0.05" value="1"></div>
+      <div class="set-row"><label>테이블 속도<span class="sub">공이 잘 구르면 빠름</span></label>
+        <div class="seg" id="segSpeed"><button type="button" data-v="slow">느림</button><button type="button" data-v="mid">보통</button><button type="button" data-v="fast">빠름</button></div></div>
+      <div class="set-row"><label>사진 배경</label>
+        <div class="seg" id="segBg"><button type="button" data-v="on">보기</button><button type="button" data-v="off">끄기</button></div></div>
+      <div class="set-row"><button class="btn" type="button" id="btnSample">예시 배치로 돌아가기</button><button class="btn" type="button" id="btnCorners">코너 다시 맞추기</button></div>
+    </div>
+  </details>
+
+  <p class="note">찍는 법: 테이블 가운데 바로 위에서, 네 모서리가 모두 나오게 찍으세요. 길은 쿠션 반발·회전·마찰을 단순화한 모델로 계산한 추천이라 테이블마다 조금씩 다릅니다. 몇 번 쳐 보고 보정에서 회전 효과와 테이블 속도를 맞춰 쓰세요. 포인트는 화면 기준으로 장쿠션 왼쪽 끝 0 → 오른쪽 끝 8, 단쿠션 위 0 → 아래 4입니다. 샷 보기는 계산한 길을 실제 속도로 굴려 보여 주고, 공 배치는 이 기기에 기억돼요.</p>
+</div>
+
+<script id="engine-src">
+// 3쿠션 경로 엔진 — 좌표: 미터, 수학 좌표계(x 오른쪽, y 위쪽, z 위쪽)
+// 오른쪽 당점(E>0) => ωz>0 (위에서 볼 때 반시계)
+const Engine = (() => {
+  const R = 0.03075;
+  const TABLES = {
+    daedae: { W: 2.844, H: 1.422, name: '대대' },
+    jungdae: { W: 2.540, H: 1.270, name: '중대' }
+  };
+  const P = {
+    eC: 0.80,   // 쿠션 법선 반발계수
+    muC: 0.20,  // 쿠션 마찰
+    eB: 0.94,   // 공-공 반발
+    lamS: 5.0,  // 옆회전 감쇠 거리(m)
+    lamV: 0.8,  // 밀기/끌기 회전이 자연 구름으로 바뀌는 거리(m)
+    tip: 0.17   // 1팁 = 반지름의 17%
+  };
+  const VERT = [
+    { key: 'top', label: '상단', b: 0.5 },
+    { key: 'midtop', label: '중상단', b: 0.25 },
+    { key: 'mid', label: '중단', b: 0 },
+    { key: 'low', label: '하단', b: -0.5 }
+  ];
+  const ES = [-3, -2, -1, 0, 1, 2, 3];
+  const MAXD = 22;
+  // 레일: 0 아래(y=R) 1 오른쪽(x=W-R) 2 위(y=H-R) 3 왼쪽(x=R). 안쪽 법선
+  const RN = [[0, 1], [-1, 0], [0, -1], [1, 0]];
+
+  function makeCtx(o) {
+    const T = TABLES[o.table] || TABLES.daedae;
+    const W = T.W, H = T.H;
+    const toM = p => ({ x: p.x, y: H - p.y });
+    return {
+      W, H, R,
+      cue: toM(o.cue),
+      objs: [toM(o.objs[0]), toM(o.objs[1])],
+      spinGain: o.spinGain || 1,
+      a: o.decel || 0.15,
+      vmin: o.vmin || 0.5
+    };
+  }
+
+  // rec=false: 성공 시그니처(>0) 또는 0 반환. rec=true: 상세 객체
+  function sim(C, theta, E, vk, rec, V0) {
+    const W = C.W, H = C.H, objs = C.objs;
+    let px = C.cue.x, py = C.cue.y;
+    let vx = Math.cos(theta), vy = Math.sin(theta);
+    let S = 2.5 * E * P.tip * C.spinGain;
+    const c0 = 2.5 * VERT[vk].b;
+    let dist = 0, first = -1, cush = 0, sig = 0;
+    const useV = !!V0; let V = V0 || 0; const a = C.a;
+    let path = null, evs = null, segLens = null, ratios = null, contact = null;
+    if (rec) { path = [{ x: px, y: py }]; evs = []; segLens = []; ratios = []; }
+    const out = (ok, reason) => {
+      if (!rec) return ok ? sig : 0;
+      return { success: ok, reason, sig: ok ? sig : 0, first, path, evs, segLens, ratios, contact, cushions: cush, E, vk, theta, dist };
+    };
+    for (let it = 0; it < 20; it++) {
+      const sp = Math.hypot(vx, vy);
+      if (sp < 0.02) return out(false, 'stop');
+      const ux = vx / sp, uy = vy / sp;
+      let best = Infinity, kind = 0, rail = -1, bi = -1;
+      if (uy < -1e-12) { const s = (R - py) / uy; if (s < best) { best = s; kind = 1; rail = 0; } }
+      if (ux > 1e-12) { const s = (W - R - px) / ux; if (s < best) { best = s; kind = 1; rail = 1; } }
+      if (uy > 1e-12) { const s = (H - R - py) / uy; if (s < best) { best = s; kind = 1; rail = 2; } }
+      if (ux < -1e-12) { const s = (R - px) / ux; if (s < best) { best = s; kind = 1; rail = 3; } }
+      for (let i = 0; i < 2; i++) {
+        if (i === first) continue;
+        const b = objs[i];
+        const dx = b.x - px, dy = b.y - py;
+        const proj = dx * ux + dy * uy;
+        if (proj <= 0) continue;
+        const perp2 = dx * dx + dy * dy - proj * proj;
+        const rr = 4 * R * R;
+        if (perp2 >= rr) continue;
+        const s = proj - Math.sqrt(rr - perp2);
+        if (s < -1e-7) continue;
+        if (s < best) { best = s; kind = 2; bi = i; }
+      }
+      if (best === Infinity) return out(false, 'none');
+      if (best < 0) best = 0;
+      if (useV) {
+        const need = 2 * a * best;
+        if (V * V < need) {
+          const sStop = (V * V) / (2 * a);
+          px += ux * sStop; py += uy * sStop;
+          if (rec) { path.push({ x: px, y: py }); segLens.push(sStop); }
+          return out(false, 'short');
+        }
+        V = Math.sqrt(V * V - need);
+      }
+      px += ux * best; py += uy * best; dist += best;
+      if (dist > MAXD) return out(false, 'long');
+      S *= Math.exp(-best / P.lamS);
+      if (rec) { segLens.push(best); path.push({ x: px, y: py }); }
+      if (kind === 1) {
+        const nx = RN[rail][0], ny = RN[rail][1];
+        const tx = -ny, ty = nx;
+        const vn = vx * nx + vy * ny;
+        const vt = vx * tx + vy * ty;
+        const slip = vt - S;
+        const lim = P.muC * (1 + P.eC) * Math.abs(vn);
+        let dvt = Math.min(lim, (2 / 7) * Math.abs(slip));
+        if (slip > 0) dvt = -dvt;
+        const vt2 = vt + dvt;
+        S -= 2.5 * dvt;
+        const vn2 = -P.eC * vn;
+        vx = vn2 * nx + vt2 * tx; vy = vn2 * ny + vt2 * ty;
+        const r = Math.hypot(vx, vy) / sp;
+        cush++;
+        sig = sig * 7 + rail + 1;
+        if (rec) { ratios.push(r); evs.push({ type: 'c', rail, x: px, y: py, n: cush }); }
+        if (useV) V *= r;
+      } else {
+        const b = objs[bi];
+        let nx = b.x - px, ny = b.y - py; const nl = Math.hypot(nx, ny); nx /= nl; ny /= nl;
+        if (first < 0) {
+          const ex = Math.exp(-dist / P.lamV);
+          const c = 1 + (c0 - 1) * ex;
+          const cc = Math.max(-1.25, Math.min(1.25, c0));
+          const roll = 1 - (1 - (5 + 2 * cc) / 7) * (1 - ex);
+          const cvx = vx * roll, cvy = vy * roll;
+          const vnm = cvx * nx + cvy * ny;
+          const vnx = vnm * nx, vny = vnm * ny;
+          const vtx = cvx - vnx, vty = cvy - vny;
+          const ob = (1 + P.eB) / 2, cb = (1 - P.eB) / 2;
+          const ax = vtx + cb * vnx, ay = vty + cb * vny;
+          const fx = (5 / 7) * ax + (2 / 7) * c * cvx;
+          const fy = (5 / 7) * ay + (2 / 7) * c * cvy;
+          if (rec) {
+            const gbx = px - b.x, gby = py - b.y;
+            const cr = ux * gby - uy * gbx; // >0 : 적구의 왼쪽을 맞힘
+            const thick = Math.max(0, 1 - Math.abs(cr) / (2 * R));
+            contact = {
+              x: px, y: py, ux, uy, idx: bi, thick, side: cr > 0 ? 'L' : 'R',
+              obj: { x: b.x, y: b.y, vx: ob * vnx, vy: ob * vny }, pre: sp, c
+            };
+          }
+          const r = Math.hypot(fx, fy) / sp;
+          vx = fx; vy = fy;
+          first = bi;
+          sig = sig * 7 + 5 + bi;
+          if (rec) { ratios.push(r); evs.push({ type: 'b', idx: bi, x: px, y: py }); }
+          if (useV) V *= r;
+          if (r < 0.03) return out(false, 'stop');
+        } else {
+          if (rec) evs.push({ type: 'b2', idx: bi, x: px, y: py });
+          if (cush >= 3) return out(true, 'ok');
+          return out(false, 'early');
+        }
+      }
+    }
+    return out(false, 'many');
+  }
+
+  // 2번째 적구까지 v_min을 남기는 데 필요한 초기 속도(m/s)
+  function needSpeed(rec, C) {
+    const L = rec.segLens, rt = rec.ratios;
+    let V2 = C.vmin * C.vmin;
+    for (let i = L.length - 1; i >= 0; i--) {
+      V2 += 2 * C.a * L[i];
+      if (i > 0) V2 /= rt[i - 1] * rt[i - 1];
+    }
+    return Math.sqrt(V2);
+  }
+
+  const POWER = [
+    { lv: 1, label: '약', max: 1.8 },
+    { lv: 2, label: '중약', max: 2.6 },
+    { lv: 3, label: '중', max: 3.5 },
+    { lv: 4, label: '중강', max: 4.5 },
+    { lv: 5, label: '강', max: 99 }
+  ];
+  const LEVEL_SPEED = [1.8, 2.6, 3.5, 4.5, 6.0]; // 각 단계의 상한 속도
+  function powerLevel(v) { return POWER.find(p => v <= p.max); }
+
+  // 시간축 위의 직선 경로
+  function timeline(start, segs, V0, a) {
+    // segs: [{len, dx, dy, ratioAfter}]
+    const out = []; let t = 0, V = V0, x = start.x, y = start.y;
+    for (const s of segs) {
+      const V2e = V * V - 2 * a * s.len;
+      let len = s.len, Ve;
+      if (V2e <= 0) { len = V * V / (2 * a); Ve = 0; } else Ve = Math.sqrt(V2e);
+      const dt = (V - Ve) / a;
+      out.push({ t0: t, t1: t + dt, x, y, dx: s.dx, dy: s.dy, V, len });
+      t += dt; x += s.dx * len; y += s.dy * len;
+      if (Ve === 0) { out.stopAt = { x, y, t }; break; }
+      V = Ve * (s.ratioAfter == null ? 1 : s.ratioAfter);
+    }
+    out.end = t;
+    return out;
+  }
+  function posAt(tl, t, a) {
+    for (const s of tl) {
+      if (t <= s.t1) {
+        const tau = Math.max(0, t - s.t0);
+        const d = s.V * tau - 0.5 * a * tau * tau;
+        return { x: s.x + s.dx * d, y: s.y + s.dy * d };
+      }
+    }
+    const l = tl[tl.length - 1];
+    if (!l) return null;
+    return { x: l.x + l.dx * l.len, y: l.y + l.dy * l.len };
+  }
+
+  function objectPath(C, o, V) {
+    // 무회전 적구 경로(간단 반사)
+    let px = o.x, py = o.y, sp = Math.hypot(o.vx, o.vy);
+    let ux = o.vx / sp, uy = o.vy / sp;
+    const segs = []; const pts = [{ x: px, y: py }];
+    let rem = V * V / (2 * C.a), Vc = V;
+    for (let k = 0; k < 8 && rem > 0.01; k++) {
+      let best = Infinity, rail = -1;
+      if (uy < -1e-12) { const s = (C.R - py) / uy; if (s < best) { best = s; rail = 0; } }
+      if (ux > 1e-12) { const s = (C.W - C.R - px) / ux; if (s < best) { best = s; rail = 1; } }
+      if (uy > 1e-12) { const s = (C.H - C.R - py) / uy; if (s < best) { best = s; rail = 2; } }
+      if (ux < -1e-12) { const s = (C.R - px) / ux; if (s < best) { best = s; rail = 3; } }
+      const len = Math.min(best, rem);
+      px += ux * len; py += uy * len; pts.push({ x: px, y: py });
+      const V2 = Vc * Vc - 2 * C.a * len;
+      if (len < best || V2 <= 0) { segs.push({ len, dx: ux, dy: uy, ratioAfter: 1 }); break; }
+      const nx = RN[rail][0], ny = RN[rail][1];
+      const vn = ux * nx + uy * ny, vt = ux * -ny + uy * nx;
+      const vn2 = -P.eC * vn, vt2 = vt * 0.9;
+      const nux = vn2 * nx + vt2 * -ny, nuy = vn2 * ny + vt2 * nx;
+      const r = Math.hypot(nux, nuy);
+      segs.push({ len, dx: ux, dy: uy, ratioAfter: r });
+      ux = nux / r; uy = nuy / r;
+      Vc = Math.sqrt(V2) * r; rem = Vc * Vc / (2 * C.a);
+    }
+    return { segs, pts };
+  }
+
+  function segsFromRec(rec) {
+    const segs = [];
+    for (let i = 0; i < rec.segLens.length; i++) {
+      const a = rec.path[i], b = rec.path[i + 1];
+      const L = rec.segLens[i] || 1e-9;
+      segs.push({ len: rec.segLens[i], dx: (b.x - a.x) / L, dy: (b.y - a.y) / L, ratioAfter: rec.ratios[i] });
+    }
+    return segs;
+  }
+
+  // 키스·적구 간 충돌 위험 판정
+  function riskCheck(C, rec, V0) {
+    const segs = segsFromRec(rec);
+    const tl = timeline(C.cue, segs, V0, C.a);
+    const ci = rec.evs.findIndex(e => e.type === 'b');
+    if (ci < 0) return { kiss: false, objHit: false, cueTl: tl };
+    const tContact = tl[ci] ? tl[ci].t1 : 0;
+    const tEnd = tl.end;
+    const vBefore = tl[ci] ? Math.max(0, tl[ci].V - C.a * (tl[ci].t1 - tl[ci].t0)) : V0;
+    const ob = rec.contact.obj;
+    const Vobj = vBefore * Math.hypot(ob.vx, ob.vy) / rec.contact.pre * (5 / 7);
+    let kiss = false, objHit = false, objPts = [], otl = null;
+    if (Vobj > 0.02) {
+      const op = objectPath(C, ob, Vobj);
+      objPts = op.pts;
+      otl = timeline({ x: ob.x, y: ob.y }, op.segs, Vobj, C.a);
+      const other = C.objs[1 - rec.contact.idx];
+      // 적구 타임라인은 맞은 순간이 0초 — 수구 시간에서 tContact 를 빼서 맞춤
+      for (let t = tContact + 0.04; t < tEnd; t += 0.004) {
+        const pc = posAt(tl, t, C.a), po = posAt(otl, t - tContact, C.a);
+        if (!pc || !po) continue;
+        if (Math.hypot(pc.x - po.x, pc.y - po.y) < 2 * C.R * 0.99) { kiss = true; break; }
+      }
+      for (let t = 0; t < otl.end; t += 0.004) {
+        const po = posAt(otl, t, C.a);
+        if (po && Math.hypot(po.x - other.x, po.y - other.y) < 2 * C.R) { objHit = true; break; }
+      }
+    }
+    return { kiss, objHit, objPts, cueTl: tl, objTl: otl, tContact };
+  }
+
+  function decodeSig(sig) {
+    const d = [];
+    while (sig > 0) { d.unshift(sig % 7); sig = Math.floor(sig / 7); }
+    return d; // 1~4 레일, 5/6 첫 적구
+  }
+
+  function solve(o, opts = {}) {
+    const C = makeCtx(o);
+    const N = opts.N || 4800;
+    const step = 2 * Math.PI / N;
+    const nE = ES.length, nV = VERT.length;
+    const grid = new Float64Array(nE * nV * N);
+    for (let ei = 0; ei < nE; ei++) for (let vk = 0; vk < nV; vk++) {
+      const base = (ei * nV + vk) * N;
+      for (let i = 0; i < N; i++) grid[base + i] = sim(C, i * step, ES[ei], vk, false);
+    }
+    const runs = [];
+    for (let ei = 0; ei < nE; ei++) for (let vk = 0; vk < nV; vk++) {
+      const base = (ei * nV + vk) * N;
+      let s0 = -1;
+      for (let i = 0; i < N; i++) if (grid[base + i] === 0) { s0 = i; break; }
+      if (s0 < 0) s0 = 0;
+      let cur = 0, start = 0, len = 0;
+      for (let k = 1; k <= N; k++) {
+        const i = (s0 + k) % N;
+        const g = k === N ? 0 : grid[base + i];
+        if (g !== 0 && g === cur) { len++; continue; }
+        if (cur !== 0 && len > 0) runs.push({ ei, vk, sig: cur, start, len });
+        cur = g; start = i; len = g !== 0 ? 1 : 0;
+      }
+    }
+    // 시그니처별 상위 몇 개만 정밀 평가
+    const bySig = new Map();
+    for (const r of runs) { if (!bySig.has(r.sig)) bySig.set(r.sig, []); bySig.get(r.sig).push(r); }
+    const cands = [];
+    for (const [, arr] of bySig) { arr.sort((a, b) => b.len - a.len); cands.push(...arr.slice(0, 4)); }
+    cands.sort((a, b) => b.len - a.len);
+    const evald = [];
+    for (const r of cands.slice(0, 90)) {
+      const th = (r.start + (r.len - 1) / 2) * step;
+      const E = ES[r.ei];
+      const rec = sim(C, th, E, r.vk, true);
+      if (!rec.success) continue;
+      const V0 = needSpeed(rec, C);
+      if (V0 > 7) continue;
+      const pw = powerLevel(V0);
+      const risk = riskCheck(C, rec, V0);
+      const width = r.len * step * 180 / Math.PI;
+      const d1 = rec.segLens[0];
+      const tolMM = d1 * Math.tan(r.len * step / 2) * 1000;
+      let spinOK = 0;
+      for (const de of [-1, 1]) {
+        const ei2 = r.ei + de;
+        if (ei2 < 0 || ei2 >= nE) continue;
+        if (grid[(ei2 * nV + r.vk) * N + ((r.start + Math.floor((r.len - 1) / 2)) % N)] === r.sig) spinOK++;
+      }
+      let score = width * (1 + 0.3 * spinOK);
+      if (pw.lv === 5) score *= 0.6; else if (pw.lv === 4) score *= 0.85;
+      if (risk.kiss) score *= 0.45;
+      if (risk.objHit) score *= 0.6;
+      if (rec.contact && rec.contact.thick < 0.08) score *= 0.55;
+      if (Math.abs(E) === 3) score *= 0.9;
+      if (VERT[r.vk].key === 'low' && rec.contact && rec.evs.findIndex(e => e.type === 'b') === 0 && d1 > 1.0) score *= 0.75;
+      if (rec.cushions > 4) score *= Math.pow(0.88, rec.cushions - 4);
+      evald.push({ rec, E, vk: r.vk, theta: th, width, tolMM, V0, pw, risk, spinOK, score, sig: r.sig });
+    }
+    const bestBySig = new Map();
+    for (const e of evald) { const b = bestBySig.get(e.sig); if (!b || e.score > b.score) bestBySig.set(e.sig, e); }
+    const list = [...bestBySig.values()].sort((a, b) => b.score - a.score).slice(0, opts.top || 6);
+    return { C, list, nRuns: runs.length };
+  }
+
+  // 수구 출발점에서 theta 방향으로 쭉 그은 선이 처음 닿는 쿠션
+  function railHit(C, theta) {
+    const ux = Math.cos(theta), uy = Math.sin(theta), px = C.cue.x, py = C.cue.y;
+    let best = Infinity, rail = -1;
+    if (uy < -1e-12) { const s = (R - py) / uy; if (s < best) { best = s; rail = 0; } }
+    if (ux > 1e-12) { const s = (C.W - R - px) / ux; if (s < best) { best = s; rail = 1; } }
+    if (uy > 1e-12) { const s = (C.H - R - py) / uy; if (s < best) { best = s; rail = 2; } }
+    if (ux < -1e-12) { const s = (R - px) / ux; if (s < best) { best = s; rail = 3; } }
+    return rail < 0 ? null : { rail, x: px + ux * best, y: py + uy * best };
+  }
+
+  return { R, TABLES, P, VERT, ES, makeCtx, sim, solve, needSpeed, powerLevel, POWER, LEVEL_SPEED, riskCheck, decodeSig, objectPath, timeline, posAt, railHit };
+})();
+if (typeof module !== 'undefined') module.exports = Engine;
+
+</script>
+<script>
+// 사진 보정 · 공 인식 (브라우저/노드 공용, ImageData 유사 객체 {data,width,height})
+const Vision = (() => {
+  function rgb2hsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let h = 0;
+    if (d > 1e-6) {
+      if (mx === r) h = ((g - b) / d) % 6;
+      else if (mx === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60; if (h < 0) h += 360;
+    }
+    return [h, mx === 0 ? 0 : d / mx, mx];
+  }
+  const hueDist = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
+
+  function solve8(A, b) {
+    const n = 8;
+    for (let i = 0; i < n; i++) {
+      let p = i;
+      for (let r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r;
+      [A[i], A[p]] = [A[p], A[i]]; [b[i], b[p]] = [b[p], b[i]];
+      const piv = A[i][i]; if (Math.abs(piv) < 1e-12) return null;
+      for (let r = 0; r < n; r++) {
+        if (r === i) continue;
+        const f = A[r][i] / piv;
+        if (!f) continue;
+        for (let c = i; c < n; c++) A[r][c] -= f * A[i][c];
+        b[r] -= f * b[i];
+      }
+    }
+    return b.map((v, i) => v / A[i][i]);
+  }
+  // src[i] -> dst[i] 로 보내는 호모그래피
+  function homography(src, dst) {
+    const A = [], b = [];
+    for (let i = 0; i < 4; i++) {
+      const [x, y] = src[i], [u, v] = dst[i];
+      A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u);
+      A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v);
+    }
+    const h = solve8(A, b);
+    return h ? [...h, 1] : null;
+  }
+  function apply(H, x, y) {
+    const w = H[6] * x + H[7] * y + H[8];
+    return [(H[0] * x + H[1] * y + H[2]) / w, (H[3] * x + H[4] * y + H[5]) / w];
+  }
+
+  // 화면상 코너 [TL,TR,BR,BL] → 테이블 좌표 코너 대응 (긴 변을 가로로)
+  function tableCornerMap(q, W, H) {
+    const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const horiz = d(q[0], q[1]) + d(q[3], q[2]);
+    const vert = d(q[0], q[3]) + d(q[1], q[2]);
+    const T = [[0, 0], [W, 0], [W, H], [0, H]];
+    const img = horiz >= vert ? [q[0], q[1], q[2], q[3]] : [q[3], q[0], q[1], q[2]];
+    return { img, T };
+  }
+
+  // 천 영역에서 코너 자동 검출
+  function autoCorners(im, opts = {}) {
+    const { width: w, height: h, data } = im;
+    const hs = new Float32Array(w * h), ss = new Float32Array(w * h), vs = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) {
+      const [H, S, V] = rgb2hsv(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
+      hs[i] = H; ss[i] = S; vs[i] = V;
+    }
+    const hist = new Float32Array(36);
+    const x0 = Math.floor(w * 0.3), x1 = Math.floor(w * 0.7), y0 = Math.floor(h * 0.3), y1 = Math.floor(h * 0.7);
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = y * w + x; if (ss[i] > 0.28 && vs[i] > 0.18) hist[Math.floor(hs[i] / 10) % 36]++;
+    }
+    let mb = 0; for (let k = 1; k < 36; k++) if (hist[k] > hist[mb]) mb = k;
+    if (hist[mb] < 20) return null;
+    // 모드 근처 평균 색상
+    let sx = 0, sy = 0, vsum = [];
+    const hc0 = mb * 10 + 5;
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const i = y * w + x;
+      if (ss[i] > 0.28 && vs[i] > 0.18 && hueDist(hs[i], hc0) < 15) {
+        const a = hs[i] * Math.PI / 180; sx += Math.cos(a); sy += Math.sin(a); vsum.push(vs[i]);
+      }
+    }
+    let hc = Math.atan2(sy, sx) * 180 / Math.PI; if (hc < 0) hc += 360;
+    vsum.sort((a, b) => a - b);
+    const clothV = vsum[Math.floor(vsum.length / 2)] || 0.5;
+    const mask = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) if (hueDist(hs[i], hc) < 22 && ss[i] > 0.2 && vs[i] > clothV * 0.35) mask[i] = 1;
+    // 중앙에서 가장 가까운 천 픽셀부터 flood fill
+    let seed = -1, bd = Infinity;
+    for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) {
+      const i = y * w + x; if (!mask[i]) continue;
+      const d = (x - w / 2) ** 2 + (y - h / 2) ** 2; if (d < bd) { bd = d; seed = i; }
+    }
+    if (seed < 0) return null;
+    const vis = new Uint8Array(w * h); const st = [seed]; vis[seed] = 1;
+    let area = 0;
+    let tl = [0, 0, Infinity], br = [0, 0, -Infinity], tr = [0, 0, -Infinity], bl = [0, 0, Infinity];
+    while (st.length) {
+      const i = st.pop(); area++;
+      const x = i % w, y = (i - x) / w;
+      const s1 = x + y, s2 = x - y;
+      if (s1 < tl[2]) tl = [x, y, s1];
+      if (s1 > br[2]) br = [x, y, s1];
+      if (s2 > tr[2]) tr = [x, y, s2];
+      if (s2 < bl[2]) bl = [x, y, s2];
+      if (x > 0 && mask[i - 1] && !vis[i - 1]) { vis[i - 1] = 1; st.push(i - 1); }
+      if (x < w - 1 && mask[i + 1] && !vis[i + 1]) { vis[i + 1] = 1; st.push(i + 1); }
+      if (y > 0 && mask[i - w] && !vis[i - w]) { vis[i - w] = 1; st.push(i - w); }
+      if (y < h - 1 && mask[i + w] && !vis[i + w]) { vis[i + w] = 1; st.push(i + w); }
+    }
+    if (area < w * h * 0.08) return null;
+    return { quad: [[tl[0], tl[1]], [tr[0], tr[1]], [br[0], br[1]], [bl[0], bl[1]]], clothHue: hc, clothV };
+  }
+
+  // 천 바깥 테두리(쿠션 윗면 포함) → 쿠션 끝선 안쪽으로 당기기
+  function insetQuad(q, W, H, m) {
+    const { img } = tableCornerMap(q, W, H);
+    const Hm = homography([[0, 0], [W + 2 * m, 0], [W + 2 * m, H + 2 * m], [0, H + 2 * m]], img);
+    if (!Hm) return q;
+    const inner = [[m, m], [W + m, m], [W + m, H + m], [m, H + m]].map(p => apply(Hm, p[0], p[1]));
+    // inner 는 테이블 순서 → 화면 순서 [TL,TR,BR,BL] 로 되돌리기
+    const d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    const horiz = d(q[0], q[1]) + d(q[3], q[2]);
+    const vert = d(q[0], q[3]) + d(q[1], q[2]);
+    if (horiz >= vert) return inner;
+    return [inner[1], inner[2], inner[3], inner[0]];
+  }
+
+  // 테이블 펴기: 출력 (gw x gh) 가 테이블 [0,W]x[0,H] (y 아래쪽)
+  function warp(src, quad, W, H, gw, gh) {
+    const { img, T } = tableCornerMap(quad, W, H);
+    const Ht = homography(T, img);
+    const out = { width: gw, height: gh, data: new Uint8ClampedArray(gw * gh * 4) };
+    if (!Ht) return out;
+    const sw = src.width, sh = src.height, sd = src.data, od = out.data;
+    for (let gy = 0; gy < gh; gy++) {
+      const ty = (gy + 0.5) / gh * H;
+      for (let gx = 0; gx < gw; gx++) {
+        const tx = (gx + 0.5) / gw * W;
+        const w = Ht[6] * tx + Ht[7] * ty + Ht[8];
+        const ix = (Ht[0] * tx + Ht[1] * ty + Ht[2]) / w - 0.5;
+        const iy = (Ht[3] * tx + Ht[4] * ty + Ht[5]) / w - 0.5;
+        const o = (gy * gw + gx) * 4;
+        if (ix < 0 || iy < 0 || ix >= sw - 1 || iy >= sh - 1) { od[o + 3] = 255; continue; }
+        const x0 = ix | 0, y0 = iy | 0, fx = ix - x0, fy = iy - y0;
+        const i00 = (y0 * sw + x0) * 4, i10 = i00 + 4, i01 = i00 + sw * 4, i11 = i01 + 4;
+        for (let c = 0; c < 3; c++) {
+          od[o + c] = (sd[i00 + c] * (1 - fx) + sd[i10 + c] * fx) * (1 - fy) + (sd[i01 + c] * (1 - fx) + sd[i11 + c] * fx) * fy;
+        }
+        od[o + 3] = 255;
+      }
+    }
+    return out;
+  }
+
+  // 펴진 이미지에서 흰/노란/빨간 공 찾기
+  function detectBalls(wp, W, H, R) {
+    const { width: gw, height: gh, data } = wp;
+    const ppm = gw / W, rpx = R * ppm, exp = Math.PI * rpx * rpx;
+    const n = gw * gh;
+    const cls = new Uint8Array(n); // 1 흰 2 노랑 3 빨강
+    const vals = [];
+    for (let i = 0; i < n; i += 7) vals.push(Math.max(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]) / 255);
+    vals.sort((a, b) => a - b);
+    const medV = vals[Math.floor(vals.length / 2)] || 0.5;
+    const whiteV = Math.max(0.58, Math.min(0.85, medV + 0.25));
+    for (let i = 0; i < n; i++) {
+      const [h, s, v] = rgb2hsv(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
+      if (s <= 0.24 && v >= whiteV) cls[i] = 1;
+      else if (h >= 36 && h <= 70 && s >= 0.40 && v >= 0.42) cls[i] = 2;
+      else if ((h <= 18 || h >= 335) && s >= 0.42 && v >= 0.22) cls[i] = 3;
+    }
+    const seen = new Uint8Array(n);
+    const blobs = { 1: [], 2: [], 3: [] };
+    for (let i = 0; i < n; i++) {
+      if (!cls[i] || seen[i]) continue;
+      const c = cls[i]; const st = [i]; seen[i] = 1;
+      let area = 0, sx = 0, sy = 0, x0 = gw, x1 = 0, y0 = gh, y1 = 0;
+      while (st.length) {
+        const j = st.pop(); area++;
+        const x = j % gw, y = (j - x) / gw;
+        sx += x; sy += y;
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        const nb = [x > 0 ? j - 1 : -1, x < gw - 1 ? j + 1 : -1, y > 0 ? j - gw : -1, y < gh - 1 ? j + gw : -1];
+        for (const k of nb) if (k >= 0 && !seen[k] && cls[k] === c) { seen[k] = 1; st.push(k); }
+      }
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+      const rA = area / exp;
+      if (rA < 0.18 || rA > 3.2) continue;
+      if (bw > rpx * 3.6 || bh > rpx * 3.6) continue;
+      const fill = area / (bw * bh);
+      if (fill < 0.35) continue;
+      const asp = Math.min(bw, bh) / Math.max(bw, bh);
+      const score = (1 - Math.min(1, Math.abs(Math.log(rA)) / 1.6)) * 0.6 + asp * 0.25 + fill * 0.15;
+      const cx = (sx / area + (x0 + x1) / 2) / 2, cy = (sy / area + (y0 + y1) / 2) / 2;
+      blobs[c].push({ x: (cx + 0.5) / ppm, y: (cy + 0.5) / ppm, area, score });
+    }
+    const pick = (arr, avoid) => {
+      let best = null;
+      for (const b of arr) {
+        if (avoid.some(a => a && Math.hypot(a.x - b.x, a.y - b.y) < R * 1.8)) continue;
+        if (!best || b.score > best.score) best = b;
+      }
+      return best;
+    };
+    const yellow = pick(blobs[2], []);
+    const red = pick(blobs[3], [yellow]);
+    const white = pick(blobs[1].filter(b => b.area / exp > 0.3), [yellow, red]);
+    return { white, yellow, red };
+  }
+
+  return { rgb2hsv, homography, apply, tableCornerMap, autoCorners, insetQuad, warp, detectBalls };
+})();
+if (typeof module !== 'undefined') module.exports = Vision;
+
+</script>
+<script>
+(() => {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const SPEEDS = { slow: 0.20, mid: 0.15, fast: 0.11 };
+  const RAILV = 0.15, CUSH = 0.032;
+  const BALLNAME = { white: '흰공', yellow: '노란공', red: '빨간공' };
+  const RAILNAME = ['아래 장', '오른쪽 단', '위 장', '왼쪽 단'];
+  const SAMPLE = { white: { x: 0.75, y: 0.95 }, red: { x: 1.55, y: 0.62 }, yellow: { x: 2.35, y: 1.15 } };
+
+  const state = {
+    table: 'daedae', myBall: 'white', spinGain: 1, speed: 'mid', showPhoto: true,
+    balls: JSON.parse(JSON.stringify(SAMPLE)),
+    source: 'sample', detect: null,
+    mode: 'rec', sols: [], sel: 0, solving: false, solveId: 0,
+    aim: { theta: 0.43, E: 1, vk: 0, power: 2 },
+    photo: null, quad: null, warped: null, view: 'table'
+  };
+  try {
+    const s = JSON.parse(localStorage.getItem('cue3-settings') || '{}');
+    for (const k of ['table', 'myBall', 'spinGain', 'speed', 'showPhoto']) if (s[k] !== undefined) state[k] = s[k];
+  } catch (e) { /* 저장소 없음 */ }
+  function saveSettings() {
+    try { localStorage.setItem('cue3-settings', JSON.stringify({ table: state.table, myBall: state.myBall, spinGain: state.spinGain, speed: state.speed, showPhoto: state.showPhoto })); } catch (e) { /* 무시 */ }
+  }
+
+  // 마지막 공 배치 기억 (같은 테이블 크기일 때만)
+  try {
+    const L = JSON.parse(localStorage.getItem('cue3-layout') || 'null');
+    if (L && L.table === state.table && L.balls && ['white', 'yellow', 'red'].every(k => L.balls[k] && isFinite(L.balls[k].x) && isFinite(L.balls[k].y))) {
+      state.balls = L.balls; state.source = 'saved';
+    }
+  } catch (e) { /* 저장소 없음 */ }
+  function saveLayout() {
+    try { localStorage.setItem('cue3-layout', JSON.stringify({ table: state.table, balls: state.balls })); } catch (e) { /* 무시 */ }
+  }
+
+  const T = () => Engine.TABLES[state.table];
+  const otherKey = () => state.myBall === 'white' ? 'yellow' : 'white';
+  const objKey = i => i === 0 ? 'red' : otherKey();
+  function ctxObj() {
+    return {
+      table: state.table, cue: state.balls[state.myBall],
+      objs: [state.balls.red, state.balls[otherKey()]],
+      spinGain: state.spinGain, decel: SPEEDS[state.speed]
+    };
+  }
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function toast(msg, kind) { const t = $('#toast'); if (!msg) { t.hidden = true; return; } t.textContent = msg; t.className = 'toast' + (kind === 'info' ? ' info' : ''); t.hidden = false; }
+
+  // ---------- 계산(워커) ----------
+  let worker = null;
+  try {
+    const src = document.getElementById('engine-src').textContent +
+      '\nself.onmessage=function(e){var r=Engine.solve(e.data.o);self.postMessage({id:e.data.id,list:r.list.map(function(s){return{rec:s.rec,E:s.E,vk:s.vk,theta:s.theta,width:s.width,tolMM:s.tolMM,V0:s.V0,pw:s.pw,risk:{kiss:s.risk.kiss,objHit:s.risk.objHit,objPts:s.risk.objPts},spinOK:s.spinOK,score:s.score,sig:s.sig};})});};';
+    worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    worker.onmessage = e => { if (e.data.id === state.solveId) finishSolve(e.data.list); };
+    worker.onerror = () => { worker = null; solveMain(state.solveId); };
+  } catch (e) { worker = null; }
+
+  function solveMain(id) {
+    setTimeout(() => {
+      const r = Engine.solve(ctxObj());
+      if (id === state.solveId) finishSolve(r.list);
+    }, 20);
+  }
+  function requestSolve() {
+    stopAnim();
+    state.solving = true; state.solveId++;
+    renderStatus(); renderRec();
+    if (worker) worker.postMessage({ id: state.solveId, o: ctxObj() });
+    else solveMain(state.solveId);
+  }
+  function finishSolve(list) {
+    state.sols = list; state.sel = 0; state.solving = false;
+    renderStatus(); renderRec(); drawTable();
+  }
+
+  // ---------- 표기 ----------
+  function railPoint(ev) {
+    const t = T();
+    if (ev.rail === 0 || ev.rail === 2) return (ev.x / (t.W / 8)).toFixed(1);
+    return ((t.H - ev.y) / (t.H / 4)).toFixed(1);
+  }
+  function thickLabel(t) {
+    if (t >= 0.94) return '정면';
+    if (t < 0.09) return '아주 얇게';
+    const fr = [[7 / 8, '7/8'], [3 / 4, '3/4'], [5 / 8, '5/8'], [1 / 2, '1/2'], [3 / 8, '3/8'], [1 / 4, '1/4'], [1 / 8, '1/8']];
+    let best = fr[0];
+    for (const f of fr) if (Math.abs(f[0] - t) < Math.abs(best[0] - t)) best = f;
+    return best[1] + ' 두께';
+  }
+  function aimText(rec) {
+    const c = rec.contact; if (!c) return '';
+    const nm = BALLNAME[objKey(c.idx)];
+    if (c.thick >= 0.94) return `${nm} 정면 (두께 ${Math.round(c.thick * 100)}%)`;
+    return `${nm} ${c.side === 'L' ? '왼쪽' : '오른쪽'} · ${thickLabel(c.thick)} (${Math.round(c.thick * 100)}%)`;
+  }
+  function tipText(E, vk) {
+    const v = Engine.VERT[vk].label;
+    if (E === 0) return `${v} 가운데`;
+    return `${E > 0 ? '오른쪽' : '왼쪽'} ${Math.abs(E)}팁 · ${v}`;
+  }
+  function tipSvg(E, vk, size) {
+    const r = 20, tip = Engine.P.tip * r;
+    const x = E * tip, y = -Engine.VERT[vk].b * r;
+    return `<svg viewBox="-24 -24 48 48" width="${size}" height="${size}" aria-hidden="true">
+      <circle r="${r}" fill="var(--ball-white)" stroke="var(--muted)" stroke-width="1.2"/>
+      <line x1="${-r}" y1="0" x2="${r}" y2="0" stroke="var(--line)" stroke-width="0.8"/>
+      <line x1="0" y1="${-r}" x2="0" y2="${r}" stroke="var(--line)" stroke-width="0.8"/>
+      <circle cx="${x}" cy="${y}" r="3.6" fill="var(--accent)" stroke="var(--surface)" stroke-width="1"/></svg>`;
+  }
+  // 수구 뒤에서 본 겹침: 적구(채움)와 맞는 순간의 수구(점선)
+  function thickSvg(c) {
+    const r = 15, off = (c.side === 'L' ? -1 : 1) * (1 - c.thick) * 2 * r;
+    return `<svg viewBox="-36 -17 72 34" aria-hidden="true">
+      <circle r="${r}" fill="var(--ball-${objKey(c.idx)})" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
+      <circle cx="${off}" r="${r}" fill="var(--ball-${state.myBall})" fill-opacity="0.45" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="3 2.5"/></svg>`;
+  }
+  function aimPointText(rec) {
+    if (!rec.evs.length || rec.evs[0].type !== 'b') return '';
+    const h = Engine.railHit(Engine.makeCtx(ctxObj()), rec.theta);
+    return h ? `<div class="sub">겨냥선을 쭉 이으면 ${RAILNAME[h.rail]}쿠션 <span class="num">${railPoint(h)}</span> 포인트</div>` : '';
+  }
+  function shotType(rec) {
+    const bi = rec.evs.findIndex(e => e.type === 'b');
+    if (bi === 0) return '공 먼저';
+    if (bi >= 3) return '뱅크샷';
+    return `빈쿠션 ${bi}쿠션 먼저`;
+  }
+  function routeHTML(rec) {
+    const ok = rec.success;
+    const parts = [];
+    for (const e of rec.evs) {
+      if (e.type === 'c') parts.push(`<span class="step"><span class="k">${e.n}</span>${RAILNAME[e.rail]} <span class="num">${railPoint(e)}</span></span>`);
+      else if (e.type === 'b') parts.push(`<span class="step">${BALLNAME[objKey(e.idx)]}</span>`);
+      else parts.push(`<span class="step">${BALLNAME[objKey(e.idx)]}${ok ? ' 득점' : ''}</span>`);
+    }
+    return `<div class="route">${parts.join('<span class="arr">→</span>')}</div>`;
+  }
+  function diff(tol) {
+    if (tol >= 14) return { cls: 'easy', tag: 'good', t: '쉬움' };
+    if (tol >= 7) return { cls: 'mid', tag: 'warn', t: '보통' };
+    return { cls: 'hard', tag: 'bad', t: '어려움' };
+  }
+  function pipsHTML(lv) { let s = '<span class="pips" aria-hidden="true">'; for (let i = 1; i <= 5; i++) s += `<i class="${i <= lv ? 'on' : ''}"></i>`; return s + '</span>'; }
+
+  // ---------- 상태 표시 ----------
+  function renderStatus() {
+    const el = $('#status'); const out = [];
+    if (state.source === 'sample') out.push('<span class="pill">예시 배치</span>');
+    else if (state.source === 'saved') out.push('<span class="pill">지난 배치</span>');
+    else {
+      for (const k of ['white', 'yellow', 'red']) {
+        const ok = state.detect && state.detect[k];
+        out.push(`<span class="pill ${ok ? '' : 'miss'}"><span class="dot" style="background:var(--ball-${k})"></span>${ok ? BALLNAME[k] : BALLNAME[k] + ' 확인'}</span>`);
+      }
+    }
+    if (state.solving) out.push('<span class="pill busy">계산 중</span>');
+    el.innerHTML = out.join('');
+  }
+
+  function renderRec() {
+    const chips = $('#solChips'), det = $('#solDetail');
+    $('#recSub').textContent = state.solving ? '모든 각도·당점을 시험하는 중' : (state.sols.length ? `${state.sols.length}가지 · 쉬운 순` : '');
+    if (state.solving && !state.sols.length) { chips.innerHTML = ''; det.innerHTML = '<p class="empty">길을 찾는 중이에요.</p>'; return; }
+    if (!state.sols.length) {
+      chips.innerHTML = '';
+      det.innerHTML = '<p class="empty">이 배치에서는 3쿠션 길을 찾지 못했어요. 공 위치가 맞는지 확인하거나, 보정에서 테이블 속도를 빠름으로 바꿔 보세요.</p>';
+      return;
+    }
+    chips.innerHTML = state.sols.map((s, i) => {
+      const d = diff(s.tolMM);
+      const first = BALLNAME[objKey(s.rec.contact.idx)];
+      const bi = s.rec.evs.findIndex(e => e.type === 'b');
+      const title = bi === 0 ? `${first} 먼저` : shotType(s.rec);
+      const tipS = s.E === 0 ? Engine.VERT[s.vk].label : `${s.E > 0 ? '우' : '좌'}${Math.abs(s.E)}팁 ${Engine.VERT[s.vk].label}`;
+      return `<button type="button" class="chip" data-i="${i}" aria-pressed="${i === state.sel}">
+        <span class="n"><span class="lvl ${d.cls}"></span>길 ${i + 1}</span>
+        <span class="t">${title}</span>
+        <span class="s">${tipS} · 힘 ${s.pw.label}</span></button>`;
+    }).join('');
+    const s = state.sols[state.sel];
+    const d = diff(s.tolMM);
+    const bi = s.rec.evs.findIndex(e => e.type === 'b');
+    let aim;
+    if (bi === 0) aim = `<div class="thick">${thickSvg(s.rec.contact)}<div>${aimText(s.rec)}${aimPointText(s.rec)}</div></div>`;
+    else {
+      const f = s.rec.evs[0];
+      aim = `<div class="thick">${thickSvg(s.rec.contact)}<div>${RAILNAME[f.rail]}쿠션 <span class="num">${railPoint(f)}</span> 지점을 먼저 겨냥<div class="sub">${aimText(s.rec)}로 맞음</div></div></div>`;
+    }
+    const risks = [];
+    if (s.risk.kiss) risks.push('<span class="tag warn">키스 가능</span>');
+    if (s.risk.objHit) risks.push('<span class="tag warn">적구끼리 부딪힐 수 있음</span>');
+    if (!risks.length) risks.push('<span class="tag good">특이 위험 없음</span>');
+    det.innerHTML = `<table class="kv">
+      <tr><th>길</th><td>${routeHTML(s.rec)}</td></tr>
+      <tr><th>겨냥</th><td>${aim}</td></tr>
+      <tr><th>당점</th><td><div class="tipcell">${tipSvg(s.E, s.vk, 44)}<span>${tipText(s.E, s.vk)}</span></div></td></tr>
+      <tr><th>힘</th><td>${pipsHTML(s.pw.lv)}<b>${s.pw.lv}단계 · ${s.pw.label}</b><div class="sub">수구 초속 약 <span class="num">${s.V0.toFixed(1)}</span> m/s · 두 번째 공까지 여유 있게 닿는 힘</div></td></tr>
+      <tr><th>허용 오차</th><td><span class="num">±${s.tolMM.toFixed(0)} mm</span> <span class="tag ${d.tag}">${d.t}</span><div class="sub">첫 목표 지점에서 이만큼 벗어나도 득점</div></td></tr>
+      <tr><th>위험</th><td>${risks.join(' ')}</td></tr>
+    </table>`;
+  }
+
+  // ---------- 당구대 그리기 ----------
+  const cvT = $('#cvTable');
+  let geo = { s: 100, w: 300, h: 150 };
+  function layoutTable() {
+    const t = T();
+    const w = cvT.parentElement.clientWidth || 360;
+    const s = w / (t.W + 2 * RAILV);
+    const h = (t.H + 2 * RAILV) * s;
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    cvT.width = Math.round(w * dpr); cvT.height = Math.round(h * dpr);
+    cvT.style.height = h + 'px';
+    geo = { s, w, h, dpr };
+  }
+  const TX = x => (RAILV + x) * geo.s;
+  const TY = y => (RAILV + y) * geo.s;
+  const M = p => ({ x: TX(p.x), y: TY(T().H - p.y) }); // 엔진(수학 좌표) → 캔버스
+
+  function ball(g, x, y, r, col, ring) {
+    const grd = g.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+    grd.addColorStop(0, '#ffffff');
+    grd.addColorStop(0.25, col);
+    grd.addColorStop(1, shade(col, -0.35));
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fillStyle = grd; g.fill();
+    g.lineWidth = 1; g.strokeStyle = 'rgba(0,0,0,0.45)'; g.stroke();
+    if (ring) { g.beginPath(); g.arc(x, y, r + 4, 0, Math.PI * 2); g.lineWidth = 2; g.strokeStyle = ring; g.stroke(); }
+  }
+  function shade(hex, k) {
+    const m = hex.match(/^#?([0-9a-f]{6})$/i); if (!m) return hex;
+    const n = parseInt(m[1], 16); let r = n >> 16, gg = (n >> 8) & 255, b = n & 255;
+    const f = v => Math.max(0, Math.min(255, Math.round(k < 0 ? v * (1 + k) : v + (255 - v) * k)));
+    return `rgb(${f(r)},${f(gg)},${f(b)})`;
+  }
+  function arrowOn(g, a, b, col) {
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, L = Math.hypot(b.x - a.x, b.y - a.y);
+    if (L < 26) return;
+    const ang = Math.atan2(b.y - a.y, b.x - a.x), z = 5.5;
+    g.save(); g.translate(mx, my); g.rotate(ang);
+    g.beginPath(); g.moveTo(z, 0); g.lineTo(-z, -z * 0.8); g.lineTo(-z, z * 0.8); g.closePath();
+    g.fillStyle = col; g.fill(); g.restore();
+  }
+  function polyline(g, pts, col, w, dash, edge) {
+    if (pts.length < 2) return;
+    g.save(); g.lineJoin = 'round'; g.lineCap = 'round';
+    if (edge) {
+      g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y));
+      g.strokeStyle = edge; g.lineWidth = w + 2.5; g.setLineDash(dash || []); g.stroke();
+    }
+    g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y));
+    g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.stroke();
+    g.restore();
+  }
+
+  function currentShot() {
+    if (state.mode === 'aim') return aimShot;
+    const s = state.sols[state.sel];
+    if (!s || state.solving) return null;
+    return { rec: s.rec, objPts: s.risk.objPts };
+  }
+
+  function drawTable() {
+    const g = cvT.getContext('2d'), t = T(), s = geo.s;
+    g.setTransform(geo.dpr, 0, 0, geo.dpr, 0, 0);
+    g.clearRect(0, 0, geo.w, geo.h);
+    // 레일
+    const rail = css('--rail'), railHi = css('--rail-hi');
+    const rg = g.createLinearGradient(0, 0, 0, geo.h);
+    rg.addColorStop(0, railHi); rg.addColorStop(0.5, rail); rg.addColorStop(1, railHi);
+    roundRect(g, 0, 0, geo.w, geo.h, 10); g.fillStyle = rg; g.fill();
+    // 쿠션
+    g.fillStyle = css('--cloth-deep');
+    g.fillRect(TX(-CUSH), TY(-CUSH), (t.W + 2 * CUSH) * s, (t.H + 2 * CUSH) * s);
+    // 천 / 사진
+    if (state.showPhoto && state.warped && state.source === 'photo') {
+      g.drawImage(state.warped, TX(0), TY(0), t.W * s, t.H * s);
+    } else {
+      const cg = g.createRadialGradient(TX(t.W / 2), TY(t.H / 2), 10, TX(t.W / 2), TY(t.H / 2), t.W * s * 0.65);
+      cg.addColorStop(0, shade(css('--cloth'), 0.08)); cg.addColorStop(1, css('--cloth'));
+      g.fillStyle = cg; g.fillRect(TX(0), TY(0), t.W * s, t.H * s);
+    }
+    // 다이아몬드
+    const pearl = css('--pearl'), mid = (RAILV + CUSH) / 2 + 0.005;
+    g.fillStyle = pearl;
+    const dia = (x, y) => { const z = Math.max(2.2, 0.012 * s); g.beginPath(); g.moveTo(x, y - z); g.lineTo(x + z * 0.7, y); g.lineTo(x, y + z); g.lineTo(x - z * 0.7, y); g.closePath(); g.fill(); };
+    g.font = `500 ${Math.max(8, Math.min(11, s * 0.045))}px ${css('--f-num') || 'monospace'}`;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    // 위 장쿠션·왼쪽 단쿠션은 짝수 포인트 자리에 숫자를 새김
+    for (let i = 0; i <= 8; i++) {
+      const x = TX(i * t.W / 8);
+      if (i % 2 === 0) g.fillText(String(i), x, TY(-mid)); else dia(x, TY(-mid));
+      if (i > 0 && i < 8) dia(x, TY(t.H + mid));
+    }
+    for (let j = 0; j <= 4; j++) {
+      const y = TY(j * t.H / 4);
+      if (j === 0) continue;
+      if (j % 2 === 0) g.fillText(String(j), TX(-mid), y); else dia(TX(-mid), y);
+      if (j < 4) dia(TX(t.W + mid), y);
+    }
+
+    const shot = currentShot();
+    const R = Engine.R * s;
+    const cueKey = state.myBall;
+    if (shot && shot.rec) {
+      const rec = shot.rec;
+      if (shot.objPts && shot.objPts.length > 1) polyline(g, shot.objPts.map(M), 'rgba(255,120,120,0.85)', 1.6, [5, 5]);
+      const pts = rec.path.map(M);
+      // 조준선(수구 → 첫 지점)
+      polyline(g, pts, css('--path'), 2, null, css('--path-edge'));
+      for (let i = 0; i < pts.length - 1; i++) arrowOn(g, pts[i], pts[i + 1], css('--path'));
+      if (rec.evs.length && rec.evs[0].type === 'b' && !anim) {
+        const h = Engine.railHit(Engine.makeCtx(ctxObj()), rec.theta);
+        if (h) {
+          const a = M(rec.contact), b = M(h);
+          polyline(g, [a, b], 'rgba(255,255,255,0.5)', 1.2, [2, 5]);
+          g.beginPath(); g.arc(b.x, b.y, 4, 0, Math.PI * 2); g.lineWidth = 1.4; g.strokeStyle = 'rgba(255,255,255,0.75)'; g.stroke();
+        }
+      }
+      if (rec.contact && !anim) {
+        const c = M(rec.contact);
+        g.save(); g.setLineDash([3, 3]); g.lineWidth = 1.4; g.strokeStyle = css('--path');
+        g.beginPath(); g.arc(c.x, c.y, R, 0, Math.PI * 2); g.stroke(); g.restore();
+      }
+      // 쿠션 번호
+      for (const e of rec.evs) {
+        if (e.type !== 'c') continue;
+        const n = [[0, -1], [1, 0], [0, 1], [-1, 0]][e.rail]; // 수학 좌표 바깥쪽
+        const p = M({ x: e.x + n[0] * Engine.R, y: e.y + n[1] * Engine.R });
+        const rr = Math.max(7, Math.min(10, s * 0.035));
+        g.beginPath(); g.arc(p.x, p.y, rr, 0, Math.PI * 2); g.fillStyle = css('--brass'); g.fill();
+        g.lineWidth = 1.2; g.strokeStyle = 'rgba(0,0,0,0.35)'; g.stroke();
+        g.fillStyle = '#1a1206'; g.font = `700 ${rr * 1.15}px ${css('--f-num') || 'monospace'}`;
+        g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(e.n), p.x, p.y + 0.5);
+      }
+      if (rec.stopAt) {
+        const p = M(rec.stopAt); g.save(); g.strokeStyle = css('--bad'); g.lineWidth = 2.2;
+        g.beginPath(); g.moveTo(p.x - 5, p.y - 5); g.lineTo(p.x + 5, p.y + 5); g.moveTo(p.x + 5, p.y - 5); g.lineTo(p.x - 5, p.y + 5); g.stroke(); g.restore();
+      }
+    }
+    // 공
+    const cols = { white: css('--ball-white'), yellow: css('--ball-yellow'), red: css('--ball-red') };
+    const pos = {};
+    for (const k of ['red', 'white', 'yellow']) pos[k] = { x: TX(state.balls[k].x), y: TY(state.balls[k].y) };
+    if (anim) Object.assign(pos, anim.pos);
+    if (anim && anim.scored) {
+      const p = pos[anim.secondKey];
+      g.beginPath(); g.arc(p.x, p.y, R + 7, 0, Math.PI * 2); g.lineWidth = 3; g.strokeStyle = css('--good'); g.stroke();
+    }
+    for (const k of ['red', 'white', 'yellow']) {
+      ball(g, pos[k].x, pos[k].y, R, cols[k], k === cueKey && !anim ? css('--accent') : null);
+    }
+    if (anim) return;
+    // 내 공 표시
+    const cb = state.balls[cueKey];
+    g.save(); g.font = `700 11px ${css('--f-body') || 'sans-serif'}`; g.textAlign = 'center';
+    const ly = TY(cb.y) - R - 8 < TY(0) + 4 ? TY(cb.y) + R + 16 : TY(cb.y) - R - 8;
+    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.strokeText('내 공', TX(cb.x), ly);
+    g.fillStyle = '#ffffff'; g.fillText('내 공', TX(cb.x), ly); g.restore();
+  }
+  function roundRect(g, x, y, w, h, r) {
+    g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  }
+
+  // ---------- 당구대 조작 ----------
+  let drag = null;
+  function tablePt(ev) {
+    const r = cvT.getBoundingClientRect();
+    return { x: (ev.clientX - r.left) / geo.s - RAILV, y: (ev.clientY - r.top) / geo.s - RAILV };
+  }
+  function clampBall(p) {
+    const t = T(), R = Engine.R;
+    return { x: Math.min(t.W - R, Math.max(R, p.x)), y: Math.min(t.H - R, Math.max(R, p.y)) };
+  }
+  function separate(key) {
+    const R = Engine.R, b = state.balls[key];
+    for (const k of Object.keys(state.balls)) {
+      if (k === key) continue;
+      const o = state.balls[k]; const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy);
+      if (d < 2 * R + 0.002) {
+        const ux = d > 1e-6 ? dx / d : 1, uy = d > 1e-6 ? dy / d : 0;
+        state.balls[key] = clampBall({ x: o.x + ux * (2 * R + 0.003), y: o.y + uy * (2 * R + 0.003) });
+      }
+    }
+  }
+  cvT.addEventListener('pointerdown', ev => {
+    const p = tablePt(ev);
+    const hit = Math.max(Engine.R * 2.6, 22 / geo.s);
+    let best = null, bd = Infinity;
+    for (const k of Object.keys(state.balls)) {
+      const b = state.balls[k]; const d = Math.hypot(b.x - p.x, b.y - p.y);
+      if (d < hit && d < bd) { bd = d; best = k; }
+    }
+    stopAnim();
+    if (best) {
+      const b = state.balls[best];
+      drag = { kind: 'ball', key: best, ox: b.x - p.x, oy: b.y - p.y, before: snapBalls() };
+    } else if (state.mode === 'aim') {
+      drag = { kind: 'aim' }; setAimFrom(p);
+    } else return;
+    cvT.setPointerCapture(ev.pointerId);
+    ev.preventDefault();
+  });
+  cvT.addEventListener('pointermove', ev => {
+    if (!drag) return;
+    const p = tablePt(ev);
+    if (drag.kind === 'ball') {
+      state.balls[drag.key] = clampBall({ x: p.x + drag.ox, y: p.y + drag.oy });
+      if (state.mode === 'aim') updateAim(); else { state.sols = []; }
+      drawTable();
+    } else setAimFrom(p);
+  });
+  const endDrag = () => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    if (d.kind === 'ball') {
+      separate(d.key);
+      const nb = state.balls[d.key], ob = d.before[d.key];
+      if (Math.hypot(nb.x - ob.x, nb.y - ob.y) >= 1e-4) {
+        pushUndo(d.before);
+        if (state.source === 'sample') state.source = 'saved';
+        saveLayout();
+      }
+      if (state.mode === 'aim') { updateAim(); drawTable(); }
+      requestSolve();
+    }
+  };
+  cvT.addEventListener('pointerup', endDrag);
+  cvT.addEventListener('pointercancel', endDrag);
+
+  // ---------- 되돌리기 ----------
+  const undoStack = [];
+  const snapBalls = () => JSON.parse(JSON.stringify(state.balls));
+  function pushUndo(snap) {
+    undoStack.push(snap); if (undoStack.length > 30) undoStack.shift();
+    $('#btnUndo').disabled = false;
+  }
+  $('#btnUndo').addEventListener('click', () => {
+    const snap = undoStack.pop(); if (!snap) return;
+    $('#btnUndo').disabled = !undoStack.length;
+    state.balls = snap; saveLayout();
+    aimShot = null; if (state.mode === 'aim') updateAim();
+    drawTable(); requestSolve();
+  });
+
+  // ---------- 샷 재생 ----------
+  let anim = null;
+  function stopAnim() {
+    if (!anim) return;
+    cancelAnimationFrame(anim.raf); clearTimeout(anim.hold);
+    anim = null; setPlayBtn(false); drawTable();
+  }
+  function setPlayBtn(on) {
+    const b = $('#btnPlay');
+    b.querySelector('span').textContent = on ? '멈추기' : '샷 보기';
+    b.querySelector('svg').innerHTML = on ? '<rect x="6" y="6" width="12" height="12" rx="1.5"/>' : '<path d="M7 5v14l12-7z"/>';
+  }
+  function playShot() {
+    if (anim) { stopAnim(); return; }
+    const shot = currentShot();
+    if (!shot || !shot.rec || shot.rec.path.length < 2) { toast('보여 줄 샷이 없어요. 추천 길을 고르거나 직접 조준해 주세요.', 'info'); return; }
+    const rec = shot.rec;
+    const V0 = state.mode === 'aim' ? Engine.LEVEL_SPEED[state.aim.power - 1] : state.sols[state.sel].V0;
+    const C = Engine.makeCtx(ctxObj());
+    const rk = Engine.riskCheck(C, rec, V0);
+    const cueTl = rk.cueTl;
+    const objKeyHit = rec.contact ? objKey(rec.contact.idx) : null;
+    const end = Math.min(9, Math.max(cueTl.end, rk.objTl ? rk.tContact + rk.objTl.end : 0));
+    const secondKey = rec.success ? objKey(rec.evs[rec.evs.length - 1].idx) : null;
+    anim = { pos: {}, scored: false, secondKey, raf: 0, hold: 0 };
+    setPlayBtn(true); toast('');
+    const t0 = performance.now();
+    const frame = now => {
+      if (!anim) return;
+      const t = Math.min(end, (now - t0) / 1000);
+      const pc = Engine.posAt(cueTl, t, C.a);
+      if (pc) anim.pos[state.myBall] = M(pc);
+      if (objKeyHit && rk.objTl && t > rk.tContact) {
+        const po = Engine.posAt(rk.objTl, t - rk.tContact, C.a);
+        if (po) anim.pos[objKeyHit] = M(po);
+      }
+      anim.scored = !!secondKey && t >= cueTl.end;
+      drawTable();
+      if (t < end) anim.raf = requestAnimationFrame(frame);
+      else anim.hold = setTimeout(stopAnim, 1200);
+    };
+    anim.raf = requestAnimationFrame(frame);
+  }
+  $('#btnPlay').addEventListener('click', playShot);
+
+  // ---------- 직접 조준 ----------
+  let aimShot = null;
+  function setAimFrom(p) {
+    if (anim) stopAnim();
+    const cb = state.balls[state.myBall];
+    const dx = p.x - cb.x, dy = -(p.y - cb.y);
+    if (Math.hypot(dx, dy) < 0.02) return;
+    state.aim.theta = Math.atan2(dy, dx);
+    updateAim(); drawTable();
+  }
+  function updateAim() {
+    const o = ctxObj(); const C = Engine.makeCtx(o);
+    const a = state.aim;
+    const V0 = Engine.LEVEL_SPEED[a.power - 1];
+    const rv = Engine.sim(C, a.theta, a.E, a.vk, true, V0);
+    const rg = Engine.sim(C, a.theta, a.E, a.vk, true);
+    if (rv.reason === 'short') rv.stopAt = rv.path[rv.path.length - 1];
+    let objPts = null, risk = null;
+    if (rv.contact) { risk = Engine.riskCheck(C, rv, V0); objPts = risk.objPts; }
+    const need = rg.success ? Engine.needSpeed(rg, C) : null;
+    aimShot = { rec: rv, objPts, geo: rg, need, risk };
+    renderAim();
+  }
+  const REASON = {
+    early: '3쿠션 전에 두 번째 공에 먼저 맞음', short: '힘이 부족해 도중에 멈춤',
+    none: '두 번째 공을 맞히지 못함', long: '두 번째 공을 맞히지 못함', many: '두 번째 공을 맞히지 못함', stop: '맞은 뒤 공이 거의 멈춤'
+  };
+  function renderAim() {
+    const a = state.aim, sh = aimShot;
+    let deg = a.theta * 180 / Math.PI; if (deg < 0) deg += 360;
+    $('#angOut').textContent = deg.toFixed(1) + '°';
+    $('#tipCap').textContent = tipText(a.E, a.vk);
+    drawTipPicker();
+    [...$('#powSeg').children].forEach((b, i) => b.setAttribute('aria-pressed', String(i + 1 === a.power)));
+    if (!sh) return;
+    const rec = sh.rec;
+    let res;
+    if (rec.success) res = '<span class="tag good">득점</span>';
+    else if (rec.first < 0) res = `<span class="tag bad">실패</span> <span class="sub">${rec.reason === 'short' ? '힘이 부족해 멈춤' : '적구를 맞히지 못함'}</span>`;
+    else res = `<span class="tag bad">실패</span> <span class="sub">${REASON[rec.reason] || '두 번째 공을 맞히지 못함'}</span>`;
+    const cushions = rec.evs.filter(e => e.type === 'c').length;
+    let needTxt = '<span class="sub">이 방향·당점으로는 득점 길이 아님</span>';
+    if (sh.need != null) {
+      const pw = Engine.powerLevel(sh.need);
+      needTxt = sh.need > 7 ? '<span class="sub">너무 먼 길이라 힘이 감당되지 않음</span>' : `${pipsHTML(pw.lv)}<b>${pw.lv}단계 · ${pw.label}</b> 이상<div class="sub">수구 초속 약 <span class="num">${sh.need.toFixed(1)}</span> m/s</div>`;
+    }
+    const risks = [];
+    if (sh.risk && sh.risk.kiss) risks.push('<span class="tag warn">키스 가능</span>');
+    if (sh.risk && sh.risk.objHit) risks.push('<span class="tag warn">적구끼리 부딪힐 수 있음</span>');
+    $('#aimTable').innerHTML = `
+      <tr><th>결과</th><td>${res} ${risks.join(' ')}</td></tr>
+      <tr><th>길</th><td>${rec.evs.length ? routeHTML(rec) : '<span class="sub">-</span>'}</td></tr>
+      <tr><th>두께</th><td>${rec.contact ? `<div class="thick">${thickSvg(rec.contact)}<div>${aimText(rec)}${aimPointText(rec)}</div></div>` : '<span class="sub">-</span>'}</td></tr>
+      <tr><th>쿠션</th><td><span class="num">${cushions}</span>회</td></tr>
+      <tr><th>필요한 힘</th><td>${needTxt}</td></tr>`;
+  }
+  // 당점 선택기
+  const tipEl = $('#tipSvg');
+  function drawTipPicker() {
+    const r = 54, tip = Engine.P.tip * r, a = state.aim;
+    let s = `<circle r="${r}" fill="var(--ball-white)" stroke="var(--muted)" stroke-width="1.5"/>`;
+    s += `<line x1="${-r}" y1="0" x2="${r}" y2="0" stroke="var(--line)"/><line x1="0" y1="${-r}" x2="0" y2="${r}" stroke="var(--line)"/>`;
+    for (const E of Engine.ES) for (let vk = 0; vk < Engine.VERT.length; vk++) {
+      const x = E * tip, y = -Engine.VERT[vk].b * r;
+      const on = E === a.E && vk === a.vk;
+      s += `<circle cx="${x}" cy="${y}" r="${on ? 6.5 : 2.6}" fill="${on ? 'var(--accent)' : 'var(--muted)'}" ${on ? 'stroke="var(--surface)" stroke-width="2"' : 'opacity="0.55"'}/>`;
+    }
+    tipEl.innerHTML = s;
+  }
+  function pickTip(ev) {
+    const r = tipEl.getBoundingClientRect();
+    const x = (ev.clientX - r.left) / r.width * 124 - 62, y = (ev.clientY - r.top) / r.height * 124 - 62;
+    const R = 54, tip = Engine.P.tip * R;
+    let best = null, bd = Infinity;
+    for (const E of Engine.ES) for (let vk = 0; vk < Engine.VERT.length; vk++) {
+      const d = Math.hypot(E * tip - x, -Engine.VERT[vk].b * R - y);
+      if (d < bd) { bd = d; best = { E, vk }; }
+    }
+    if (best && (best.E !== state.aim.E || best.vk !== state.aim.vk)) { state.aim.E = best.E; state.aim.vk = best.vk; updateAim(); drawTable(); }
+  }
+  let tipDrag = false;
+  tipEl.addEventListener('pointerdown', e => { tipDrag = true; tipEl.setPointerCapture(e.pointerId); pickTip(e); });
+  tipEl.addEventListener('pointermove', e => { if (tipDrag) pickTip(e); });
+  tipEl.addEventListener('pointerup', () => { tipDrag = false; });
+  $('#powSeg').innerHTML = Engine.POWER.map(p => `<button type="button" data-p="${p.lv}">${p.label}</button>`).join('');
+  $('#powSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.aim.power = +b.dataset.p; updateAim(); drawTable(); });
+  document.querySelectorAll('.nudge button').forEach(b => b.addEventListener('click', () => {
+    state.aim.theta += (+b.dataset.d) * Math.PI / 180; updateAim(); drawTable();
+  }));
+
+  function setMode(m) {
+    stopAnim();
+    state.mode = m;
+    $('#mRec').setAttribute('aria-pressed', String(m === 'rec'));
+    $('#mAim').setAttribute('aria-pressed', String(m === 'aim'));
+    $('#recPanel').hidden = m !== 'rec';
+    $('#aimPanel').hidden = m !== 'aim';
+    $('#tableHint').textContent = m === 'aim' ? '빈 곳을 끌면 조준, 공을 끌면 위치 이동이에요.' : '공을 끌어서 위치를 고칠 수 있어요. 놓으면 길을 다시 계산합니다.';
+    if (m === 'aim') {
+      const s = state.sols[state.sel];
+      if (s && !aimShot) { state.aim.theta = s.theta; state.aim.E = s.E; state.aim.vk = s.vk; state.aim.power = Math.min(5, s.pw.lv); }
+      updateAim();
+    }
+    drawTable();
+  }
+  $('#mRec').addEventListener('click', () => setMode('rec'));
+  $('#mAim').addEventListener('click', () => { aimShot = null; setMode('aim'); });
+  $('#solChips').addEventListener('click', e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    stopAnim(); state.sel = +b.dataset.i; renderRec(); drawTable();
+  });
+
+  // ---------- 사진 & 코너 ----------
+  const cvP = $('#cvPhoto');
+  let pgeo = { k: 1, w: 300, h: 200, dpr: 1 };
+  let cdrag = null, cdrag0 = null;
+  function showView(v) {
+    state.view = v;
+    $('#viewCorner').hidden = v !== 'corner';
+    $('#viewTable').style.display = v === 'table' ? 'flex' : 'none';
+    if (v === 'corner') { layoutPhoto(); drawPhoto(); }
+    else { layoutTable(); drawTable(); }
+  }
+  function layoutPhoto() {
+    if (!state.photo) return;
+    const w = cvP.parentElement.clientWidth || 360;
+    const ph = state.photo;
+    let k = w / ph.w;
+    const maxH = Math.max(320, window.innerHeight * 0.72);
+    if (ph.h * k > maxH) k = maxH / ph.h;
+    const cw = ph.w * k, ch = ph.h * k;
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    cvP.width = Math.round(cw * dpr); cvP.height = Math.round(ch * dpr);
+    cvP.style.width = cw + 'px'; cvP.style.height = ch + 'px';
+    pgeo = { k, w: cw, h: ch, dpr };
+  }
+  function drawPhoto() {
+    if (!state.photo) return;
+    const g = cvP.getContext('2d'); const { k } = pgeo;
+    g.setTransform(pgeo.dpr, 0, 0, pgeo.dpr, 0, 0);
+    g.clearRect(0, 0, pgeo.w, pgeo.h);
+    g.drawImage(state.photo.canvas, 0, 0, pgeo.w, pgeo.h);
+    const q = state.quad; if (!q) return;
+    g.beginPath(); q.forEach((p, i) => i ? g.lineTo(p[0] * k, p[1] * k) : g.moveTo(p[0] * k, p[1] * k)); g.closePath();
+    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.55)'; g.stroke();
+    g.lineWidth = 1.5; g.strokeStyle = '#ffd54a'; g.stroke();
+    for (let i = 0; i < 4; i++) {
+      const x = q[i][0] * k, y = q[i][1] * k;
+      g.beginPath(); g.arc(x, y, 13, 0, Math.PI * 2); g.fillStyle = 'rgba(255,213,74,0.22)'; g.fill();
+      g.lineWidth = 2; g.strokeStyle = '#ffd54a'; g.stroke();
+      g.beginPath(); g.moveTo(x - 6, y); g.lineTo(x + 6, y); g.moveTo(x, y - 6); g.lineTo(x, y + 6); g.lineWidth = 1.5; g.stroke();
+    }
+    if (cdrag != null) {
+      const p = q[cdrag]; const x = p[0] * k, y = p[1] * k;
+      const L = 58, Z = 3.2;
+      const lx = x < pgeo.w / 2 ? pgeo.w - L - 8 : L + 8, ly = L + 8;
+      g.save(); g.beginPath(); g.arc(lx, ly, L, 0, Math.PI * 2); g.clip();
+      g.fillStyle = '#000'; g.fillRect(lx - L, ly - L, 2 * L, 2 * L);
+      const sz = (2 * L) / (Z * k);
+      g.drawImage(state.photo.canvas, p[0] - sz / 2, p[1] - sz / 2, sz, sz, lx - L, ly - L, 2 * L, 2 * L);
+      g.strokeStyle = '#ffd54a'; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(lx - L, ly); g.lineTo(lx + L, ly); g.moveTo(lx, ly - L); g.lineTo(lx, ly + L); g.stroke();
+      g.restore();
+      g.beginPath(); g.arc(lx, ly, L, 0, Math.PI * 2); g.lineWidth = 2; g.strokeStyle = '#ffd54a'; g.stroke();
+    }
+  }
+  function photoPt(ev) {
+    const r = cvP.getBoundingClientRect();
+    return [(ev.clientX - r.left) / pgeo.k, (ev.clientY - r.top) / pgeo.k];
+  }
+  cvP.addEventListener('pointerdown', ev => {
+    if (!state.quad) return;
+    const p = photoPt(ev); let bi = -1, bd = Infinity;
+    state.quad.forEach((q, i) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1]) * pgeo.k; if (d < bd) { bd = d; bi = i; } });
+    if (bd > 40) return;
+    cdrag = bi; cdrag0 = { p, q: state.quad[bi].slice() };
+    cvP.setPointerCapture(ev.pointerId); ev.preventDefault(); drawPhoto();
+  });
+  cvP.addEventListener('pointermove', ev => {
+    if (cdrag == null) return;
+    const p = photoPt(ev);
+    const nx = cdrag0.q[0] + (p[0] - cdrag0.p[0]), ny = cdrag0.q[1] + (p[1] - cdrag0.p[1]);
+    state.quad[cdrag] = [Math.min(state.photo.w, Math.max(0, nx)), Math.min(state.photo.h, Math.max(0, ny))];
+    drawPhoto();
+  });
+  const endC = () => { cdrag = null; drawPhoto(); };
+  cvP.addEventListener('pointerup', endC); cvP.addEventListener('pointercancel', endC);
+
+  function defaultQuad() {
+    const { w, h } = state.photo; const mx = w * 0.1, my = h * 0.1;
+    return [[mx, my], [w - mx, my], [w - mx, h - my], [mx, h - my]];
+  }
+  function autoFind() {
+    const ph = state.photo; const t = T();
+    const ac = Vision.autoCorners(ph.small);
+    if (ac) {
+      const q = ac.quad.map(p => [p[0] / ph.k2, p[1] / ph.k2]);
+      state.quad = Vision.insetQuad(q, t.W, t.H, 0.05);
+      $('#cornerMsg').textContent = '테이블을 찾았어요';
+    } else {
+      state.quad = defaultQuad();
+      $('#cornerMsg').textContent = '자동으로 못 찾았어요. 직접 맞춰 주세요';
+    }
+    drawPhoto();
+  }
+  async function decodeImage(file) {
+    if (window.createImageBitmap) {
+      // 갤럭시 고화소(50MP·200MP) 사진도 메모리 걱정 없이: 디코딩하면서 바로 줄이기
+      try { const bm = await createImageBitmap(file, { imageOrientation: 'from-image', resizeWidth: 1600, resizeQuality: 'high' }); if (bm && bm.width) return bm; } catch (e) { /* 다음 방법 */ }
+      try { const bm = await createImageBitmap(file, { imageOrientation: 'from-image' }); if (bm && bm.width) return bm; } catch (e) { /* 다음 방법 */ }
+      try { const bm = await createImageBitmap(file); if (bm && bm.width) return bm; } catch (e) { /* 다음 방법 */ }
+    }
+    const url = URL.createObjectURL(file);
+    try {
+      return await new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => (im.naturalWidth ? res(im) : rej(new Error('decode')));
+        im.onerror = () => rej(new Error('decode'));
+        im.src = url;
+      });
+    } finally { setTimeout(() => URL.revokeObjectURL(url), 2000); }
+  }
+  let loading = false;
+  async function loadPhoto(file) {
+    if (loading) return;
+    loading = true;
+    toast('사진 불러오는 중…', 'info');
+    try {
+      let src;
+      try { src = await decodeImage(file); } catch (e) { throw new Error('decode'); }
+      const sw = src.width || src.naturalWidth, sh = src.height || src.naturalHeight;
+      if (!sw || !sh) throw new Error('decode');
+      const k = Math.min(1, 1600 / Math.max(sw, sh));
+      const c = document.createElement('canvas'); c.width = Math.round(sw * k); c.height = Math.round(sh * k);
+      const g = c.getContext('2d', { willReadFrequently: true }); g.drawImage(src, 0, 0, c.width, c.height);
+      if (src.close) src.close();
+      const data = g.getImageData(0, 0, c.width, c.height);
+      const k2 = 480 / Math.max(c.width, c.height);
+      const sc = document.createElement('canvas'); sc.width = Math.round(c.width * k2); sc.height = Math.round(c.height * k2);
+      const sg = sc.getContext('2d', { willReadFrequently: true }); sg.drawImage(c, 0, 0, sc.width, sc.height);
+      const small = sg.getImageData(0, 0, sc.width, sc.height);
+      state.photo = { canvas: c, data, w: c.width, h: c.height, small, k2 };
+      toast('');
+      $('#uploadHelp').hidden = true;
+      showView('corner');
+      autoFind();
+      $('#viewCorner').scrollIntoView({ block: 'start' });
+    } catch (e) {
+      const heif = /hei[cf]/i.test((file.type || '') + ' ' + (file.name || ''));
+      toast(e && e.message === 'decode'
+        ? (heif
+          ? '고효율 사진(HEIF)이라 열 수 없어요. 사진을 화면 캡처해서 캡처 이미지를 올리거나, 갤럭시 카메라 설정에서 고효율 사진을 끄고 다시 찍어 주세요.'
+          : '이 사진을 열 수 없어요. 사진을 화면 캡처해서 캡처 이미지를 올려 보세요. (갤럭시의 고효율 사진 HEIF는 브라우저가 못 여는 경우가 있어요)')
+        : '사진을 처리하지 못했어요. 다른 사진으로 다시 시도해 주세요.', 'warn');
+    } finally { loading = false; }
+  }
+
+  // ---------- 사진 받기: 갤러리 · 카메라 · 기본 버튼 · 붙여넣기 · 끌어놓기 ----------
+  const isImage = f => f && ((f.type && f.type.startsWith('image/')) || /\.(jpe?g|png|webp|gif|bmp|heic|heif|avif)$/i.test(f.name || ''));
+  const pickWatch = { opened: false, done: false, timer: 0 };
+  function showHelp(lead) {
+    if (lead) $('#helpLead').textContent = lead;
+    $('#uploadHelp').hidden = false;
+    $('#uploadHelp').scrollIntoView({ block: 'nearest' });
+  }
+  function handleFiles(list) {
+    const arr = list ? [...list] : [];
+    const f = arr.find(isImage);
+    if (!f) { if (arr.length) toast('사진 파일이 아니에요. JPG나 PNG 사진을 골라 주세요.', 'warn'); return false; }
+    pickWatch.done = true; clearTimeout(pickWatch.timer);
+    loadPhoto(f);
+    return true;
+  }
+  function armWatch() {
+    pickWatch.opened = false; pickWatch.done = false;
+    clearTimeout(pickWatch.timer);
+    // 고르기 창이 뜨면 페이지가 포커스를 잃음. 그렇지 않으면 막힌 것으로 보고 대안을 보여 줌
+    pickWatch.timer = setTimeout(() => {
+      if (!pickWatch.opened && !pickWatch.done) showHelp('사진 고르는 창이 뜨지 않았다면, 이 화면에서 갤러리가 막혀 있는 거예요. 아래 방법을 써 보세요.');
+    }, 2500);
+  }
+  window.addEventListener('blur', () => { pickWatch.opened = true; });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) pickWatch.opened = true; });
+  for (const id of ['#fileIn', '#camIn', '#fileIn2']) {
+    const el = $(id);
+    const on = e => { const fs = e.target.files; if (fs && fs.length) { handleFiles(fs); try { e.target.value = ''; } catch (err) { /* 무시 */ } } };
+    el.addEventListener('change', on);
+    el.addEventListener('input', on);
+    el.addEventListener('click', armWatch);
+    el.addEventListener('cancel', () => { pickWatch.opened = true; });
+  }
+  $('#btnHelp').addEventListener('click', () => { const h = $('#uploadHelp'); if (h.hidden) showHelp(); else h.hidden = true; });
+  $('#btnHelpClose').addEventListener('click', () => { $('#uploadHelp').hidden = true; });
+  $('#btnManual').addEventListener('click', () => {
+    $('#uploadHelp').hidden = true;
+    if (state.view !== 'table') showView('table');
+    toast('당구대 그림에서 흰공·노란공·빨간공을 끌어 실제 위치에 놓으세요. 놓을 때마다 길을 다시 계산해요.', 'info');
+    $('#cvTable').scrollIntoView({ block: 'center' });
+  });
+  // 브라우저에서 직접 연 경우엔 '브라우저로 열기' 안내가 필요 없음
+  const framed = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+  if (!framed) { $('#helpBrowser').hidden = true; $('#helpLead').textContent = '사진이 안 열리면 아래 방법을 써 보세요.'; }
+  function clipFiles(e) {
+    const dt = e.clipboardData; if (!dt) return [];
+    const out = [...(dt.files || [])];
+    if (!out.length && dt.items) for (const it of dt.items) if (it.kind === 'file') { const f = it.getAsFile(); if (f) out.push(f); }
+    return out;
+  }
+  document.addEventListener('paste', e => {
+    const fs = clipFiles(e);
+    if (fs.some(isImage)) { e.preventDefault(); handleFiles(fs); }
+    else if (e.target && e.target.id === 'pasteBox') { e.preventDefault(); toast('복사된 사진이 없어요. 사진을 먼저 복사해 주세요.', 'warn'); }
+  });
+  $('#pasteBox').addEventListener('input', e => { e.target.textContent = ''; });
+  const wrapEl = document.querySelector('.wrap');
+  const hasFiles = e => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+  wrapEl.addEventListener('dragover', e => { if (hasFiles(e)) { e.preventDefault(); document.body.classList.add('dropping'); } });
+  wrapEl.addEventListener('dragleave', e => { if (!wrapEl.contains(e.relatedTarget)) document.body.classList.remove('dropping'); });
+  wrapEl.addEventListener('drop', e => { if (!hasFiles(e)) return; e.preventDefault(); document.body.classList.remove('dropping'); handleFiles(e.dataTransfer.files); });
+  $('#btnAuto').addEventListener('click', () => { if (state.photo) autoFind(); });
+  $('#btnBackTable').addEventListener('click', () => showView('table'));
+  $('#btnCorners').addEventListener('click', () => { if (state.photo) { showView('corner'); $('#settings').open = false; } else toast('먼저 사진을 올려 주세요.'); });
+  $('#btnConfirm').addEventListener('click', () => {
+    $('#btnConfirm').disabled = true; $('#btnConfirm').textContent = '공 찾는 중…';
+    setTimeout(() => { analyzePhoto(true); $('#btnConfirm').disabled = false; $('#btnConfirm').textContent = '확정하고 공 찾기'; }, 30);
+  });
+
+  function analyzePhoto(detect) {
+    const t = T(); const gw = 900, gh = Math.round(900 * t.H / t.W);
+    const wp = Vision.warp(state.photo.data, state.quad, t.W, t.H, gw, gh);
+    const wc = document.createElement('canvas'); wc.width = gw; wc.height = gh;
+    wc.getContext('2d').putImageData(new ImageData(wp.data, gw, gh), 0, 0);
+    state.warped = wc;
+    if (detect) {
+      pushUndo(snapBalls());
+      const det = Vision.detectBalls(wp, t.W, t.H, Engine.R);
+      state.detect = {};
+      for (const k of ['white', 'yellow', 'red']) {
+        state.detect[k] = !!det[k];
+        if (det[k]) state.balls[k] = clampBall({ x: det[k].x, y: det[k].y });
+        else state.balls[k] = clampBall(state.balls[k]);
+      }
+      for (const k of ['white', 'yellow', 'red']) separate(k);
+      const miss = ['white', 'yellow', 'red'].filter(k => !state.detect[k]).map(k => BALLNAME[k]);
+      toast(miss.length ? `${miss.join(', ')}을(를) 찾지 못했어요. 당구대 위에서 끌어 제자리에 놓아 주세요.` : '');
+    }
+    state.source = 'photo';
+    saveLayout();
+    aimShot = null;
+    showView('table');
+    if (state.mode === 'aim') updateAim();
+    requestSolve();
+  }
+
+  // ---------- 설정 ----------
+  function bindSeg(id, key, onChange) {
+    const el = $(id);
+    const sync = () => [...el.children].forEach(b => b.setAttribute('aria-pressed', String(String(state[key]) === b.dataset.v || (key === 'showPhoto' && ((state.showPhoto && b.dataset.v === 'on') || (!state.showPhoto && b.dataset.v === 'off'))))));
+    el.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (key === 'showPhoto') state.showPhoto = b.dataset.v === 'on'; else state[key] = b.dataset.v;
+      sync(); saveSettings(); onChange && onChange();
+    });
+    sync();
+  }
+  bindSeg('#segTable', 'table', () => {
+    for (const k of Object.keys(state.balls)) state.balls[k] = clampBall(state.balls[k]);
+    if (state.source !== 'sample') saveLayout();
+    if (state.source === 'photo' && state.photo && state.quad) { analyzePhoto(true); return; }
+    layoutTable(); aimShot = null; if (state.mode === 'aim') updateAim(); drawTable(); requestSolve();
+  });
+  bindSeg('#segMy', 'myBall', () => { aimShot = null; if (state.mode === 'aim') updateAim(); drawTable(); requestSolve(); });
+  bindSeg('#segSpeed', 'speed', () => { if (state.mode === 'aim') updateAim(); requestSolve(); });
+  bindSeg('#segBg', 'showPhoto', () => drawTable());
+  const spinIn = $('#spinIn');
+  spinIn.value = state.spinGain; $('#spinOut').textContent = '×' + (+state.spinGain).toFixed(2).replace(/0$/, '');
+  spinIn.addEventListener('input', () => { state.spinGain = +spinIn.value; $('#spinOut').textContent = '×' + state.spinGain.toFixed(2).replace(/0$/, ''); if (state.mode === 'aim') { updateAim(); drawTable(); } });
+  spinIn.addEventListener('change', () => { saveSettings(); requestSolve(); });
+  $('#btnSample').addEventListener('click', () => {
+    pushUndo(snapBalls());
+    state.balls = JSON.parse(JSON.stringify(SAMPLE)); state.source = 'sample'; state.detect = null; toast('');
+    try { localStorage.removeItem('cue3-layout'); } catch (e) { /* 무시 */ }
+    aimShot = null; if (state.mode === 'aim') updateAim(); drawTable(); requestSolve();
+  });
+
+  // ---------- 시작 ----------
+  let lastW = 0;
+  const ro = new ResizeObserver(() => {
+    const w = document.querySelector('.wrap').clientWidth;
+    if (w === lastW) return; lastW = w;
+    if (state.view === 'table') { layoutTable(); drawTable(); } else { layoutPhoto(); drawPhoto(); }
+  });
+  ro.observe(document.querySelector('.wrap'));
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  if (mq.addEventListener) mq.addEventListener('change', () => drawTable());
+  new MutationObserver(() => drawTable()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => drawTable());
+  layoutTable(); renderStatus(); drawTable(); requestSolve();
+})();
+</script>
+
