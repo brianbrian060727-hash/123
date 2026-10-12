@@ -1,0 +1,256 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { Engine, Vision, Core } = require('./load');
+const SC = Core.score;
+
+// 재현 가능한 난수
+let seed = 12345;
+const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+function layout(table) {
+  const t = Engine.TABLES[table], m = Engine.R * 2.5, out = [];
+  while (out.length < 3) {
+    const p = { x: m + rnd() * (t.W - 2 * m), y: m + rnd() * (t.H - 2 * m) };
+    if (out.every(o => Math.hypot(o.x - p.x, o.y - p.y) > 0.2)) out.push(p);
+  }
+  return { table, cue: out[0], objs: [out[1], out[2]], decel: 0.15 };
+}
+
+// ---------- 엔진: 무작위 배치 20개 ----------
+for (let k = 0; k < 20; k++) {
+  const table = k % 4 === 3 ? 'jungdae' : 'daedae';
+  const o = layout(table);
+  test(`엔진 #${k + 1} (${table}) 추천 길은 다시 굴려도 득점`, () => {
+    const r = Engine.solve(o, { N: 1600 });
+    const C = Engine.makeCtx(o);
+    for (const s of r.list) {
+      const re = Engine.sim(C, s.theta, s.E, s.vk, true);
+      assert.equal(re.success, true);
+      assert.equal(re.sig, s.sig);
+      assert.ok(re.cushions >= 3, 'cushions');
+      assert.ok(s.V0 > 0 && s.V0 <= 7, 'V0');
+      assert.ok(s.tolMM > 0, 'tol');
+      assert.equal(s.pw, Engine.powerLevel(s.V0));
+      // 실제 속도로 굴려도 2적구까지 감
+      const rv = Engine.sim(C, s.theta, s.E, s.vk, true, s.V0 * 1.001);
+      assert.equal(rv.success, true, 'reaches with V0');
+    }
+    for (let i = 1; i < r.list.length; i++) assert.ok(r.list[i - 1].score >= r.list[i].score, 'sorted');
+  });
+}
+
+// ---------- 엔진: 물리 성질 ----------
+test('엔진: 좌우 대칭 배치는 회전만 반대인 대칭 길', () => {
+  const o = { table: 'daedae', cue: { x: 0.8, y: 0.7 }, objs: [{ x: 1.6, y: 0.4 }, { x: 2.2, y: 1.0 }] };
+  const W = 2.844, mir = { table: 'daedae', cue: { x: W - 0.8, y: 0.7 }, objs: [{ x: W - 1.6, y: 0.4 }, { x: W - 2.2, y: 1.0 }] };
+  const C1 = Engine.makeCtx(o), C2 = Engine.makeCtx(mir);
+  for (const th of [0.3, 1.0, 2.0, -0.7]) {
+    const a = Engine.sim(C1, th, 1, 0, true), b = Engine.sim(C2, Math.PI - th, -1, 0, true);
+    assert.equal(a.success, b.success); assert.equal(a.cushions, b.cushions);
+  }
+});
+test('엔진: 상하 대칭도 대칭 길', () => {
+  const H = 1.422;
+  const o = { table: 'daedae', cue: { x: 0.8, y: 0.5 }, objs: [{ x: 1.6, y: 0.3 }, { x: 2.2, y: 0.9 }] };
+  const m = { table: 'daedae', cue: { x: 0.8, y: H - 0.5 }, objs: [{ x: 1.6, y: H - 0.3 }, { x: 2.2, y: H - 0.9 }] };
+  const a = Engine.sim(Engine.makeCtx(o), 0.5, 2, 1, true), b = Engine.sim(Engine.makeCtx(m), -0.5, -2, 1, true);
+  assert.equal(a.cushions, b.cushions); assert.equal(a.success, b.success);
+});
+test('엔진: 무회전으로 쿠션에 수직이면 반발계수만큼 되돌아옴', () => {
+  const C = Engine.makeCtx({ table: 'daedae', cue: { x: 1.4, y: 0.7 }, objs: [{ x: 0.2, y: 0.2 }, { x: 0.2, y: 1.2 }] });
+  const r = Engine.sim(C, 0, 0, 2, true);
+  assert.equal(r.evs[0].type, 'c'); assert.equal(r.evs[0].rail, 1);
+  assert.ok(Math.abs(r.ratios[0] - Engine.P.eC) < 1e-9);
+});
+for (const th of [0.4, 2.6, -1.2]) test(`엔진: railHit 은 쿠션선 위 (θ=${th})`, () => {
+  const C = Engine.makeCtx({ table: 'daedae', cue: { x: 1, y: 0.6 }, objs: [{ x: 2, y: 0.3 }, { x: 2.5, y: 1 }] });
+  const h = Engine.railHit(C, th), R = Engine.R;
+  const onRail = [Math.abs(h.y - R), Math.abs(h.x - (C.W - R)), Math.abs(h.y - (C.H - R)), Math.abs(h.x - R)][h.rail];
+  assert.ok(onRail < 1e-9);
+});
+test('엔진: 느린 테이블일수록 필요한 힘이 큼', () => {
+  const o = { table: 'daedae', cue: { x: 0.75, y: 0.95 }, objs: [{ x: 1.55, y: 0.62 }, { x: 2.35, y: 1.15 }] };
+  const r = Engine.solve(o, { N: 1600 }); const s = r.list[0];
+  const slow = Engine.needSpeed(s.rec, Engine.makeCtx({ ...o, decel: 0.2 })), fast = Engine.needSpeed(s.rec, Engine.makeCtx({ ...o, decel: 0.11 }));
+  assert.ok(slow > fast);
+});
+test('엔진: 타임라인 끝 위치 = 경로 마지막 점', () => {
+  const o = { table: 'daedae', cue: { x: 0.75, y: 0.95 }, objs: [{ x: 1.55, y: 0.62 }, { x: 2.35, y: 1.15 }] };
+  const r = Engine.solve(o, { N: 1600 }); const s = r.list[0]; const C = Engine.makeCtx(o);
+  const rk = Engine.riskCheck(C, s.rec, s.V0);
+  const end = Engine.posAt(rk.cueTl, rk.cueTl.end + 1, C.a), last = s.rec.path[s.rec.path.length - 1];
+  assert.ok(Math.hypot(end.x - last.x, end.y - last.y) < 1e-6);
+});
+test('엔진: 적구 맞는 시각은 수구 첫 구간 끝', () => {
+  const o = { table: 'daedae', cue: { x: 0.75, y: 0.95 }, objs: [{ x: 1.55, y: 0.62 }, { x: 2.35, y: 1.15 }] };
+  const r = Engine.solve(o, { N: 1600 }); const s = r.list.find(x => x.rec.evs[0].type === 'b');
+  const C = Engine.makeCtx(o), rk = Engine.riskCheck(C, s.rec, s.V0);
+  assert.ok(Math.abs(rk.tContact - rk.cueTl[0].t1) < 1e-12);
+  const pc = Engine.posAt(rk.cueTl, rk.tContact, C.a);
+  assert.ok(Math.hypot(pc.x - s.rec.contact.x, pc.y - s.rec.contact.y) < 1e-6);
+});
+test('엔진: 힘이 모자라면 short 로 멈춤', () => {
+  const C = Engine.makeCtx({ table: 'daedae', cue: { x: 0.3, y: 0.7 }, objs: [{ x: 2.5, y: 0.2 }, { x: 2.5, y: 1.2 }] });
+  const r = Engine.sim(C, 0, 0, 2, true, 0.3);
+  assert.equal(r.reason, 'short');
+});
+test('엔진: 시그니처 해독은 쿠션·공 순서를 그대로', () => {
+  const C = Engine.makeCtx({ table: 'daedae', cue: { x: 0.75, y: 0.95 }, objs: [{ x: 1.55, y: 0.62 }, { x: 2.35, y: 1.15 }] });
+  const r = Engine.solve({ table: 'daedae', cue: { x: 0.75, y: 0.95 }, objs: [{ x: 1.55, y: 0.62 }, { x: 2.35, y: 1.15 }] }, { N: 1600 });
+  const s = r.list[0], d = Engine.decodeSig(s.sig);
+  const ev = s.rec.evs.filter(e => e.type !== 'b2').map(e => e.type === 'c' ? e.rail + 1 : 5 + e.idx);
+  assert.equal(JSON.stringify(d), JSON.stringify(ev));
+});
+
+// ---------- 비전 ----------
+for (const q of [[[10, 20], [310, 15], [300, 180], [5, 170]], [[50, 40], [600, 60], [620, 400], [30, 380]], [[0, 0], [100, 0], [100, 50], [0, 50]]]) {
+  test(`비전: 호모그래피 왕복 ${q[0]}`, () => {
+    const T = [[0, 0], [2.844, 0], [2.844, 1.422], [0, 1.422]];
+    const H = Vision.homography(T, q), Hi = Vision.homography(q, T);
+    for (const p of [[0.3, 0.2], [1.4, 0.7], [2.7, 1.3]]) {
+      const a = Vision.apply(H, p[0], p[1]), b = Vision.apply(Hi, a[0], a[1]);
+      assert.ok(Math.hypot(b[0] - p[0], b[1] - p[1]) < 1e-6);
+    }
+  });
+}
+test('비전: 가로로 긴 사진은 순서 그대로', () => {
+  const q = [[0, 0], [200, 0], [200, 100], [0, 100]];
+  assert.equal(JSON.stringify(Vision.tableCornerMap(q, 2.844, 1.422).img), JSON.stringify(q));
+});
+test('비전: 세로로 찍은 사진은 긴 변을 가로로 돌림', () => {
+  const q = [[0, 0], [100, 0], [100, 200], [0, 200]];
+  assert.equal(JSON.stringify(Vision.tableCornerMap(q, 2.844, 1.422).img), JSON.stringify([q[3], q[0], q[1], q[2]]));
+});
+function synth(w, h, balls, frame) {
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4;
+    const inside = !frame || (x >= frame[0] && x < frame[2] && y >= frame[1] && y < frame[3]);
+    let c = inside ? [33, 88, 184] : [74, 47, 30];
+    for (const b of balls) if ((x - b.x) ** 2 + (y - b.y) ** 2 <= b.r * b.r) c = b.c;
+    data[i] = c[0]; data[i + 1] = c[1]; data[i + 2] = c[2]; data[i + 3] = 255;
+  }
+  return { width: w, height: h, data };
+}
+for (const [k, pos] of [[1, { w: [200, 150], y: [600, 80], r: [420, 230] }], [2, { w: [80, 250], y: [820, 300], r: [450, 60] }], [3, { w: [450, 220], y: [480, 220], r: [100, 100] }]]) {
+  test(`비전: 합성 사진에서 세 공 찾기 #${k}`, () => {
+    const gw = 900, gh = 450, ppm = gw / 2.844, r = Engine.R * ppm;
+    const im = synth(gw, gh, [{ x: pos.w[0], y: pos.w[1], r, c: [245, 243, 235] }, { x: pos.y[0], y: pos.y[1], r, c: [240, 189, 34] }, { x: pos.r[0], y: pos.r[1], r, c: [207, 36, 48] }]);
+    const d = Vision.detectBalls(im, 2.844, 1.422, Engine.R);
+    for (const [key, p] of [['white', pos.w], ['yellow', pos.y], ['red', pos.r]]) {
+      assert.ok(d[key], key);
+      assert.ok(Math.hypot(d[key].x - p[0] / ppm, d[key].y - p[1] / ppm) < 0.015, key + ' within 15mm');
+    }
+  });
+}
+test('비전: 합성 테이블 사진에서 천 모서리 찾기', () => {
+  const im = synth(480, 320, [], [60, 50, 420, 270]);
+  const a = Vision.autoCorners(im);
+  assert.ok(a);
+  const exp = [[60, 50], [419, 50], [419, 269], [60, 269]];
+  a.quad.forEach((p, i) => assert.ok(Math.hypot(p[0] - exp[i][0], p[1] - exp[i][1]) < 3));
+});
+test('비전: 천이 없는 사진은 null', () => {
+  const im = { width: 100, height: 80, data: new Uint8ClampedArray(100 * 80 * 4).fill(128) };
+  assert.equal(Vision.autoCorners(im), null);
+});
+test('비전: 펴기 결과 크기와 불투명', () => {
+  const src = synth(300, 200, [], null);
+  const out = Vision.warp(src, [[10, 10], [290, 10], [290, 190], [10, 190]], 2.844, 1.422, 90, 45);
+  assert.equal(out.width, 90); assert.equal(out.data.length, 90 * 45 * 4);
+  for (let i = 3; i < out.data.length; i += 4) assert.equal(out.data[i], 255);
+});
+
+// ---------- 배치 코드 ----------
+for (let k = 0; k < 5; k++) test(`배치 코드 왕복 #${k + 1}`, () => {
+  const table = k % 2 ? 'jungdae' : 'daedae', o = layout(table), my = k % 3 ? 'white' : 'yellow';
+  const balls = { white: o.cue, yellow: o.objs[0], red: o.objs[1] };
+  const c = Core.encodeLayout(table, my, balls), d = Core.decodeLayout(c);
+  assert.equal(d.table, table); assert.equal(d.myBall, my);
+  for (const key of ['white', 'yellow', 'red']) assert.ok(Math.abs(d.balls[key].x - balls[key].x) <= 0.0005 && Math.abs(d.balls[key].y - balls[key].y) <= 0.0005);
+  assert.equal(Core.encodeLayout(d.table, d.myBall, d.balls), c);
+});
+for (const bad of ['', 'hello', '3C-X-W-0001-0002-0003-0004-0005-0006', '3C-D-W-1-2-3-4-5-6']) test(`배치 코드: 잘못된 코드 거부 "${bad}"`, () => assert.equal(Core.decodeLayout(bad), null));
+test('배치 코드: 소문자·앞뒤 글자 섞여도 읽음', () => {
+  const d = Core.decodeLayout('이 배치 어떻게 쳐요? 3c-j-y-0500-0400-1000-0600-2000-0300 부탁');
+  assert.equal(d.table, 'jungdae'); assert.equal(d.myBall, 'yellow'); assert.equal(d.balls.red.x, 2.0);
+});
+test('배치 코드: 테이블 밖 좌표는 안으로', () => {
+  const d = Core.decodeLayout('3C-J-W-9999-9999-0000-0000-1000-0600');
+  assert.ok(d.balls.white.x <= 2.540 - Engine.R + 1e-9 && d.balls.white.y <= 1.270 - Engine.R + 1e-9 && d.balls.yellow.x >= Engine.R);
+});
+
+// ---------- 길 이름 ----------
+const ev = (...xs) => ({ evs: xs.map(x => typeof x === 'number' ? { type: 'c', rail: x } : { type: x }) });
+for (const [rec, name] of [
+  [ev('b', 2, 3, 0, 'b2'), '돌리기'], [ev('b', 0, 2, 1, 'b2'), '횡단샷'], [ev('b', 1, 2, 3, 'b2'), '대회전'],
+  [ev('b', 3, 0, 1, 'b2'), '대회전'], [ev('b', 1, 2, 'b2'), '빗겨치기'], [ev(2, 'b', 3, 0, 'b2'), '빈쿠션 1쿠션'],
+  [ev(2, 3, 'b', 0, 'b2'), '빈쿠션 2쿠션'], [ev(2, 3, 0, 'b', 'b2'), '뱅크샷']
+]) test(`길 이름: ${name} (${rec.evs.map(e => e.type === 'c' ? e.rail : e.type).join(',')})`, () => assert.equal(Core.routeName(rec).name, name));
+
+// ---------- 점수 규칙 ----------
+const P = (...ts) => ts.map((t, i) => ({ name: 'P' + i, target: t }));
+const play = (g, s) => { for (const c of s) c === 'h' ? SC.hit(g) : SC.miss(g); return g; };
+test('점수: 혼자 연습은 목표 도달 즉시 끝', () => { const g = play(SC.create(P(3)), 'hhmh'); assert.ok(g.done); assert.equal(g.players[0].inn, 2); });
+test('점수: 혼자 이닝 제한', () => { const g = play(SC.create(P(99), { limit: 3 }), 'hmmhm'); assert.ok(g.done); assert.equal(g.reason, 'limit'); assert.equal(g.players[0].inn, 3); assert.equal(g.players[0].score, 2); });
+test('점수: 혼자 이닝마다 이닝 수 증가', () => { const g = play(SC.create(P(99)), 'mmmm'); assert.equal(g.players[0].inn, 5); assert.equal(g.round, 5); });
+test('점수: 선구가 먼저 끝내면 후구에게 같은 이닝', () => { const g = play(SC.create(P(2, 2)), 'hh'); assert.ok(!g.done); assert.equal(g.turn, 1); assert.ok(g.closing); });
+test('점수: 후구가 마지막 이닝에 못 따라오면 선구 승', () => { const g = play(SC.create(P(2, 2)), 'hhm'); assert.ok(g.done); assert.equal(SC.result(g), 'P0 승'); });
+test('점수: 후구가 마지막 이닝에 따라오면 무승부', () => { const g = play(SC.create(P(2, 2)), 'hhhh'); assert.ok(g.done); assert.match(SC.result(g), /무승부/); });
+test('점수: 후구가 먼저 끝내면 바로 끝', () => { const g = play(SC.create(P(5, 2)), 'mhh'); assert.ok(g.done); assert.equal(SC.result(g), 'P1 승'); assert.equal(g.players[0].inn, g.players[1].inn); });
+test('점수: 3명 중 가운데가 끝내면 마지막 선수까지', () => {
+  const g = play(SC.create(P(5, 1, 5)), 'mh'); assert.ok(!g.done); assert.equal(g.turn, 2);
+  SC.miss(g); assert.ok(g.done); assert.equal(SC.result(g), 'P1 승');
+});
+test('점수: 3명 같은 이닝 수 보장', () => {
+  const g = play(SC.create(P(1, 9, 9)), 'h'); assert.equal(g.turn, 1); play(g, 'mm'); assert.ok(g.done);
+  assert.equal(JSON.stringify(g.players.map(p => p.inn)), '[1,1,1]');
+});
+test('점수: 6명까지, 7명째는 버림', () => { const g = SC.create(P(1, 1, 1, 1, 1, 1, 1)); assert.equal(g.players.length, 6); });
+test('점수: 6명 한 바퀴 돌면 2이닝', () => { const g = play(SC.create(P(9, 9, 9, 9, 9, 9)), 'mmmmmm'); assert.equal(g.round, 2); assert.equal(g.turn, 0); assert.equal(g.players[0].inn, 2); });
+test('점수: 다인 이닝 제한', () => { const g = play(SC.create(P(9, 9, 9), { limit: 2 }), 'mmmmmm'); assert.ok(g.done); assert.equal(g.reason, 'limit'); });
+test('점수: 이닝 제한 끝나면 달성률 높은 사람 승 (핸디)', () => {
+  const g = SC.create(P(10, 4), { limit: 1 }); play(g, 'hhhm' + 'hhm'); assert.ok(g.done); assert.equal(SC.result(g), 'P1 승');
+});
+test('점수: 하이런과 연속', () => { const g = play(SC.create(P(99, 99)), 'hhhm' + 'hm' + 'hhhhh'); assert.equal(g.players[0].high, 5); assert.equal(g.run, 5); });
+test('점수: 에버리지 = 점수 ÷ 이닝', () => { const g = play(SC.create(P(99, 99)), 'hhm' + 'm' + 'hm' + 'm'); assert.equal(SC.avg(g.players[0]), 3 / 3); assert.equal(SC.avg(g.players[1]), 0); });
+test('점수: 이닝별 기록 합 = 점수', () => {
+  const g = SC.create(P(15, 15, 15)); let s = 7;
+  for (let i = 0; i < 300 && !g.done; i++) { s = (s * 31 + 11) % 97; s % 3 ? SC.hit(g) : SC.miss(g); }
+  for (const p of g.players) { assert.equal(p.log.reduce((a, b) => a + b, 0), p.score); assert.equal(p.log.length, p.inn); }
+});
+test('점수: 끝난 뒤 득점·공타 무시', () => { const g = play(SC.create(P(1)), 'h'); const j = JSON.stringify(g); play(g, 'hmhm'); assert.equal(JSON.stringify(g), j); });
+test('점수: 목표·이름 기본값과 범위', () => {
+  const g = SC.create([{ name: '  ', target: 'x' }, { name: '김', target: 9999 }, { name: 'a', target: -3 }]);
+  assert.equal(g.players[0].name, '선수 1'); assert.equal(g.players[0].target, 20); assert.equal(g.players[1].target, 500); assert.equal(g.players[2].target, 1);
+});
+test('점수: 빈 선수 목록은 오류', () => assert.throws(() => SC.create([])));
+test('점수: 첫 차례는 1이닝 시작 상태', () => { const g = SC.create(P(5, 5)); assert.equal(JSON.stringify(g.players.map(p => p.inn)), '[1,0]'); assert.equal(g.round, 1); });
+test('점수: 순위는 달성 → 달성률 → 에버', () => {
+  const g = play(SC.create(P(10, 10, 10), { limit: 1 }), 'hhm' + 'hhm' + 'hm');
+  const st = SC.standings(g).map(s => s.i); assert.equal(st[2], 2);
+});
+test('점수: 혼자 연습 결과 문구', () => { const g = play(SC.create(P(2)), 'hmh'); assert.match(SC.result(g), /목표 2점 달성 · 2이닝 · 에버 1\.000/); });
+test('점수: 혼자 이닝 제한 결과 문구', () => { const g = play(SC.create(P(9), { limit: 2 }), 'hmm'); assert.match(SC.result(g), /2이닝 동안 1점/); });
+test('점수: 진행 중 결과는 빈 문자열', () => assert.equal(SC.result(SC.create(P(3, 3))), ''));
+test('점수: 무작위 1000경기 규칙 불변식', () => {
+  let s = 1;
+  for (let k = 0; k < 1000; k++) {
+    const n = 1 + (k % 6), g = SC.create(Array.from({ length: n }, (_, i) => ({ name: 'p' + i, target: 1 + ((k + i) % 7) })), { limit: k % 5 === 0 ? 4 : 0 });
+    for (let i = 0; i < 2000 && !g.done; i++) { s = (s * 1103515245 + 12345) % 2147483648; (s >> 8) % 3 ? SC.hit(g) : SC.miss(g); }
+    assert.ok(g.done, 'finished');
+    const inn = g.players.map(p => p.inn);
+    assert.ok(Math.max(...inn) - Math.min(...inn) === 0, `equal innings ${inn}`);
+    for (const p of g.players) assert.ok(p.score <= p.target);
+  }
+});
+
+// ---------- 팀전 ----------
+test('팀전: 팀원이 이닝마다 번갈아 침', () => {
+  const g = SC.create([{ name: '철수, 영희', target: 9 }, { name: '민수·지은', target: 9 }], { team: true });
+  assert.equal(SC.shooter(g.players[0]), '철수');
+  play(g, 'mm'); assert.equal(SC.shooter(g.players[0]), '영희');
+  play(g, 'mm'); assert.equal(SC.shooter(g.players[0]), '철수');
+  assert.equal(SC.shooter(g.players[1]), '지은');
+});
+test('팀전: 개인전에서는 칠 사람 = 이름', () => { const g = SC.create(P(3, 3)); assert.equal(SC.shooter(g.players[1]), 'P1'); });
+test('팀전: 팀원 이름이 없으면 팀 이름', () => { const g = SC.create([{ name: '', target: 3 }], { team: true }); assert.equal(SC.shooter(g.players[0]), '선수 1'); });

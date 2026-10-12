@@ -209,6 +209,32 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
 .sc-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .btn.big { min-height: 58px; font-size: 16px; border-radius: 14px; }
 .btn.good { background: var(--good); border-color: var(--good); color: #fff; }
+.sc-board { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.sc-p .pname { font-weight: 700; font-size: 16px; display: flex; justify-content: space-between; gap: 6px; min-width: 0; }
+.sc-p .pname span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-p .tgt { font-family: var(--f-num); font-size: 13px; color: var(--muted); }
+.sc-p.win { border-color: var(--good); }
+.badge { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
+.badge.good { background: var(--good); color: #fff; }
+.pl-list { display: grid; gap: 8px; }
+.pl-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) 84px; gap: 8px; align-items: center; }
+.pl-row .idx { font-family: var(--f-num); color: var(--muted); font-size: 13px; text-align: center; }
+.num-in { width: 84px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-family: var(--f-num); font-size: 16px; }
+.stepper { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
+.stepper .mini { width: 40px; min-height: 40px; font-size: 18px; }
+.stepper b { font-family: var(--f-display); font-weight: 400; font-size: 26px; min-width: 22px; text-align: center; }
+.clock { display: flex; align-items: center; gap: 10px; }
+.clock-bar { flex: 1; height: 10px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+.clock-bar i { display: block; height: 100%; width: 100%; background: var(--good); }
+.clock.warn .clock-bar i { background: var(--warn); }
+.clock.over .clock-bar i { background: var(--bad); }
+.clock .num { font-size: 22px; min-width: 2.2em; text-align: right; font-weight: 500; }
+.log td.cur { background: var(--accent-soft); }
+/* 큰 화면: 점수만 크게 */
+body.focus .bar, body.focus .tabs, body.focus #scSide, body.focus #scLogWrap, body.focus #scNote { display: none !important; }
+body.focus #scGame .sc-score b { font-size: clamp(72px, 18vw, 160px); }
+body.focus #scGame .pname { font-size: clamp(18px, 3.5vw, 30px); }
+body.focus .btn.big { min-height: 84px; font-size: 20px; }
 
 /* 꿀팁 */
 details.tip { border-top: 1px solid var(--line); }
@@ -374,21 +400,26 @@ details.tip dd { margin: 0 0 4px; color: var(--muted); }
 
   <!-- 점수판 -->
   <section id="tabScore" class="col" hidden>
-    <div class="panel">
-      <div class="panel-head"><h2>3쿠션 점수판</h2><span class="sub" id="scInfo"></span></div>
-      <div class="sc-board">
-        <div class="sc-p" id="scP0">
-          <input class="name" id="scName0" type="text" maxlength="12" value="선수 A" aria-label="선수 A 이름">
-          <div class="sc-score"><b id="scS0">0</b><label>/ <input id="scT0" type="number" inputmode="numeric" min="1" max="200" value="20" aria-label="선수 A 목표 점수"></label></div>
-          <div class="sc-bar"><i id="scB0"></i></div>
-          <div class="sc-stats"><span>이닝 <span class="num" id="scI0">0</span></span><span>에버 <span class="num" id="scA0">0.000</span></span><span>하이런 <span class="num" id="scH0">0</span></span><span>연속 <span class="num" id="scR0">0</span></span></div>
-        </div>
-        <div class="sc-p" id="scP1">
-          <input class="name" id="scName1" type="text" maxlength="12" value="선수 B" aria-label="선수 B 이름">
-          <div class="sc-score"><b id="scS1">0</b><label>/ <input id="scT1" type="number" inputmode="numeric" min="1" max="200" value="20" aria-label="선수 B 목표 점수"></label></div>
-          <div class="sc-bar"><i id="scB1"></i></div>
-          <div class="sc-stats"><span>이닝 <span class="num" id="scI1">0</span></span><span>에버 <span class="num" id="scA1">0.000</span></span><span>하이런 <span class="num" id="scH1">0</span></span><span>연속 <span class="num" id="scR1">0</span></span></div>
-        </div>
+    <div class="panel" id="scSetup">
+      <div class="panel-head"><h2>경기 설정</h2><span class="sub">1명은 혼자 연습, 2~6명은 개인전</span></div>
+      <div class="set-row"><label>인원</label>
+        <div class="stepper"><button type="button" class="mini" id="scMinus" aria-label="인원 줄이기">−</button><b id="scCount">2</b><button type="button" class="mini" id="scPlus" aria-label="인원 늘리기">+</button></div></div>
+      <div class="pl-list" id="scPlayers"></div>
+      <div class="set-row"><label for="scLimit">이닝 제한<span class="sub">0이면 제한 없음. 혼자 연습이면 '20이닝 에버 측정'처럼 써요</span></label>
+        <input class="num-in" id="scLimit" type="number" inputmode="numeric" min="0" max="99" value="0"></div>
+      <div class="set-row"><label>샷 클락<span class="sub">한 샷에 쓸 수 있는 시간. 10초 남으면 소리로 알려요</span></label>
+        <div class="seg" id="scClockSeg"><button type="button" data-v="0">끔</button><button type="button" data-v="30">30초</button><button type="button" data-v="40">40초</button><button type="button" data-v="50">50초</button><button type="button" data-v="60">60초</button></div></div>
+      <div class="set-row"><label for="scTeam">팀전<span class="sub">이름 칸에 '철수, 영희'처럼 쉼표로 팀원을 적으면 이닝마다 번갈아 쳐요</span></label><input type="checkbox" id="scTeam"></div>
+      <div class="set-row"><label for="scVoice">음성 안내<span class="sub">득점과 차례를 읽어 줘요</span></label><input type="checkbox" id="scVoice"></div>
+      <button type="button" class="btn primary big" id="scStart">경기 시작</button>
+    </div>
+
+    <div class="panel" id="scGame" hidden>
+      <div class="panel-head"><h2 id="scTitle">경기 중</h2><span class="sub" id="scInfo"></span></div>
+      <div class="sc-board" id="scBoard"></div>
+      <div class="clock" id="scClock" hidden>
+        <div class="clock-bar"><i id="scClockBar"></i></div><span class="num" id="scClockNum">40</span>
+        <button type="button" class="mini" id="scExt">연장</button>
       </div>
       <div class="sc-actions">
         <button type="button" class="btn big good" id="scHit">+1 득점</button>
@@ -396,12 +427,16 @@ details.tip dd { margin: 0 0 4px; color: var(--muted); }
       </div>
       <div class="row-inline">
         <button type="button" class="btn sm" id="scUndo">되돌리기</button>
-        <button type="button" class="btn sm" id="scSwap">선구 바꾸기</button>
+        <button type="button" class="btn sm" id="scBig">큰 화면</button>
+        <button type="button" class="btn sm" id="scCopy">결과 복사</button>
         <button type="button" class="btn sm" id="scNew">새 경기</button>
       </div>
       <p class="toast info" id="scMsg" hidden></p>
-      <p class="note">점수는 득점할 때마다 +1, 못 맞히면 공타를 눌러 차례를 넘기세요. 에버리지는 점수 ÷ 이닝입니다. 선구가 먼저 목표에 닿으면 후구에게 같은 이닝 기회를 한 번 더 줍니다.</p>
+      <div id="scLogWrap"><span class="lbl">이닝별 득점</span><div class="scroll-x" id="scLog"></div></div>
+      <p class="note" id="scNote">득점하면 +1, 못 맞히면 공타. 누가 목표에 닿으면 그 이닝을 끝까지 돌려 뒷순서 선수에게 같은 이닝 기회를 줍니다. 경기 중에는 화면이 꺼지지 않게 해 둬요.</p>
     </div>
+
+    <div id="scSide" class="col">
     <div class="panel">
       <div class="panel-head"><h2>내 기록</h2><span class="sub">이 기기에 저장된 경기 기준</span></div>
       <div class="scroll-x" id="scMine"></div>
@@ -409,6 +444,7 @@ details.tip dd { margin: 0 0 4px; color: var(--muted); }
     <div class="panel">
       <div class="panel-head"><h2>최근 경기</h2><button type="button" class="mini del" id="scClear">기록 지우기</button></div>
       <div class="scroll-x" id="scHist"></div>
+    </div>
     </div>
   </section>
 
@@ -1066,6 +1102,104 @@ const Vision = (() => {
 if (typeof module !== 'undefined') module.exports = Vision;
 
 </script>
+<script id="core-src">
+// 화면과 무관한 규칙: 점수 규칙(1~6명), 배치 코드, 길 이름. 노드에서도 테스트 가능
+const Core = (() => {
+  // ---- 배치 코드: 3C-[D|J]-[W|Y]-흰x-흰y-노x-노y-빨x-빨y (mm, 화면 기준 y 아래)
+  const TBL = { daedae: { W: 2.844, H: 1.422 }, jungdae: { W: 2.540, H: 1.270 } };
+  const R = 0.03075;
+  const mm = v => String(Math.max(0, Math.min(9999, Math.round(v * 1000)))).padStart(4, '0');
+  function encodeLayout(table, myBall, balls) {
+    return `3C-${table === 'jungdae' ? 'J' : 'D'}-${myBall === 'yellow' ? 'Y' : 'W'}-` +
+      ['white', 'yellow', 'red'].map(k => mm(balls[k].x) + '-' + mm(balls[k].y)).join('-');
+  }
+  function decodeLayout(text) {
+    const m = String(text || '').trim().match(/3C-([DJ])-([WY])-(\d{4})-(\d{4})-(\d{4})-(\d{4})-(\d{4})-(\d{4})/i);
+    if (!m) return null;
+    const table = m[1].toUpperCase() === 'J' ? 'jungdae' : 'daedae';
+    const t = TBL[table];
+    const v = i => +m[i] / 1000;
+    const cl = p => ({ x: Math.min(t.W - R, Math.max(R, p.x)), y: Math.min(t.H - R, Math.max(R, p.y)) });
+    return {
+      table, myBall: m[2].toUpperCase() === 'Y' ? 'yellow' : 'white',
+      balls: { white: cl({ x: v(3), y: v(4) }), yellow: cl({ x: v(5), y: v(6) }), red: cl({ x: v(7), y: v(8) }) }
+    };
+  }
+
+  // ---- 길 이름 (장=장쿠션 레일 0·2, 단=단쿠션 레일 1·3)
+  function routeName(rec) {
+    const bi = rec.evs.findIndex(e => e.type === 'b');
+    if (bi >= 3) return { name: '뱅크샷', seq: '' };
+    const rails = rec.evs.filter((e, i) => e.type === 'c' && i > bi).map(e => e.rail);
+    const seq = rails.slice(0, 4).map(r => (r === 0 || r === 2) ? '장' : '단').join('-');
+    if (bi > 0) return { name: `빈쿠션 ${bi}쿠션`, seq };
+    const f4 = rails.slice(0, 4);
+    let name;
+    if (f4.includes(1) && f4.includes(3)) name = '대회전';
+    else if (seq.startsWith('장-장')) name = '횡단샷';
+    else if (seq.startsWith('단')) name = '빗겨치기';
+    else if (seq.startsWith('장-단-장')) name = '돌리기';
+    else name = '쿠션 길';
+    return { name, seq };
+  }
+
+  // ---- 점수 규칙
+  // 차례는 선수 순서대로 돌고, 한 바퀴가 한 이닝. 누가 목표에 닿으면 그 이닝을 끝까지 돌려
+  // 뒤 순서 선수에게 같은 이닝 기회를 줌. 이닝 제한이 있으면 그 이닝이 끝날 때 경기 종료.
+  function create(players, opts = {}) {
+    const ps = players.slice(0, 6).map((p, i) => ({
+      name: String(p.name || '').trim() || `선수 ${i + 1}`,
+      target: Math.max(1, Math.min(500, Math.round(+p.target) || 20)),
+      score: 0, inn: 0, high: 0, log: [],
+      // 팀전: 이름 칸에 '철수, 영희'처럼 적으면 팀원이 이닝마다 번갈아 침
+      members: opts.team ? String(p.name || '').split(/[,·/]/).map(x => x.trim()).filter(Boolean) : null
+    }));
+    if (!ps.length) throw new Error('players');
+    const g = { players: ps, turn: 0, round: 1, run: 0, limit: Math.max(0, Math.round(+opts.limit) || 0), team: !!opts.team, closing: false, done: false, reason: '' };
+    startTurn(g, 0);
+    return g;
+  }
+  function startTurn(g, i) { g.turn = i; g.run = 0; const p = g.players[i]; p.inn++; p.log.push(0); }
+  function endTurn(g) {
+    const n = g.players.length;
+    let next = g.turn + 1;
+    if (next >= n) {
+      if (g.closing) return finish(g, 'target');
+      if (g.limit && g.round >= g.limit) return finish(g, 'limit');
+      g.round++; next = 0;
+    }
+    startTurn(g, next);
+  }
+  function finish(g, reason) { g.done = true; g.reason = reason; g.run = 0; return g; }
+  function hit(g) {
+    if (g.done) return g;
+    const p = g.players[g.turn];
+    p.score++; p.log[p.log.length - 1]++; g.run++; p.high = Math.max(p.high, g.run);
+    if (p.score >= p.target) { g.closing = true; endTurn(g); }
+    return g;
+  }
+  function miss(g) { if (!g.done) endTurn(g); return g; }
+  const avg = p => p.inn > 0 ? p.score / p.inn : 0;
+  const shooter = p => (p.members && p.members.length) ? p.members[(Math.max(1, p.inn) - 1) % p.members.length] : p.name;
+  // 순위: 목표 달성 여부 → 달성률(핸디 공정) → 에버리지
+  function standings(g) {
+    return g.players.map((p, i) => ({ i, p, reached: p.score >= p.target, ratio: p.score / p.target, avg: avg(p) }))
+      .sort((a, b) => (b.reached - a.reached) || (b.ratio - a.ratio) || (b.avg - a.avg));
+  }
+  function result(g) {
+    if (!g.done) return '';
+    const st = standings(g);
+    if (g.players.length === 1) {
+      const p = g.players[0];
+      return p.score >= p.target ? `목표 ${p.target}점 달성 · ${p.inn}이닝 · 에버 ${avg(p).toFixed(3)}` : `${p.inn}이닝 동안 ${p.score}점 · 에버 ${avg(p).toFixed(3)}`;
+    }
+    const top = st.filter(s => s.reached === st[0].reached && Math.abs(s.ratio - st[0].ratio) < 1e-9 && (st[0].reached || Math.abs(s.avg - st[0].avg) < 1e-9));
+    return top.length > 1 ? `무승부 (${top.map(s => s.p.name).join(', ')})` : `${st[0].p.name} 승`;
+  }
+  return { encodeLayout, decodeLayout, routeName, score: { create, hit, miss, avg, shooter, standings, result } };
+})();
+if (typeof module !== 'undefined') module.exports = Core;
+</script>
 <script>
 (() => {
   'use strict';
@@ -1198,22 +1332,7 @@ if (typeof module !== 'undefined') module.exports = Vision;
     const h = Engine.railHit(Engine.makeCtx(ctxObj()), rec.theta);
     return h ? `<div class="sub">겨냥선을 쭉 이으면 ${RAILNAME[h.rail]}쿠션 <span class="num">${railPoint(h)}</span> 포인트</div>` : '';
   }
-  // 한국식 길 이름: 쿠션 순서로 판단 (장=장쿠션, 단=단쿠션)
-  function routeName(rec) {
-    const bi = rec.evs.findIndex(e => e.type === 'b');
-    if (bi >= 3) return { name: '뱅크샷', seq: '' };
-    const rails = rec.evs.filter((e, i) => e.type === 'c' && i > bi).map(e => e.rail);
-    const seq = rails.slice(0, 4).map(r => (r === 0 || r === 2) ? '장' : '단').join('-');
-    if (bi > 0) return { name: `빈쿠션 ${bi}쿠션`, seq };
-    const first4 = rails.slice(0, 4);
-    let name;
-    if (first4.includes(1) && first4.includes(3)) name = '대회전';
-    else if (seq.startsWith('장-장')) name = '횡단샷';
-    else if (seq.startsWith('단')) name = '빗겨치기';
-    else if (seq.startsWith('장-단-장')) name = '돌리기';
-    else name = '쿠션 길';
-    return { name, seq };
-  }
+  const routeName = Core.routeName;
   function routeTips(s) {
     const out = [], rec = s.rec, c = rec.contact;
     const bi = rec.evs.findIndex(e => e.type === 'b');
@@ -2018,12 +2137,7 @@ if (typeof module !== 'undefined') module.exports = Vision;
     setBalls(randomBalls(), 'saved');
     $('#cvTable').scrollIntoView({ block: 'nearest' });
   });
-  const mm = v => String(Math.max(0, Math.min(9999, Math.round(v * 1000)))).padStart(4, '0');
-  function layoutCode() {
-    const b = state.balls;
-    return `3C-${state.table === 'jungdae' ? 'J' : 'D'}-${state.myBall === 'yellow' ? 'Y' : 'W'}-` +
-      ['white', 'yellow', 'red'].map(k => mm(b[k].x) + '-' + mm(b[k].y)).join('-');
-  }
+  const layoutCode = () => Core.encodeLayout(state.table, state.myBall, state.balls);
   function renderCode() { $('#codeOut').value = layoutCode(); }
   $('#btnCopyCode').addEventListener('click', () => {
     const el = $('#codeOut'); renderCode();
@@ -2034,12 +2148,11 @@ if (typeof module !== 'undefined') module.exports = Vision;
   });
   function pickSeg(id, v) { const b = document.querySelector(`${id} button[data-v="${v}"]`); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); }
   $('#btnLoadCode').addEventListener('click', () => {
-    const m = ($('#codeIn').value || '').trim().match(/3C-([DJ])-([WY])-(\d{4})-(\d{4})-(\d{4})-(\d{4})-(\d{4})-(\d{4})/i);
-    if (!m) { toast('코드 모양이 달라요. 3C-D-W-로 시작하는 코드를 통째로 붙여 넣어 주세요.', 'warn'); return; }
-    pickSeg('#segTable', m[1].toUpperCase() === 'J' ? 'jungdae' : 'daedae');
-    pickSeg('#segMy', m[2].toUpperCase() === 'Y' ? 'yellow' : 'white');
-    const v = i => +m[i] / 1000;
-    setBalls({ white: { x: v(3), y: v(4) }, yellow: { x: v(5), y: v(6) }, red: { x: v(7), y: v(8) } }, 'saved');
+    const L = Core.decodeLayout($('#codeIn').value);
+    if (!L) { toast('코드 모양이 달라요. 3C-D-W-로 시작하는 코드를 통째로 붙여 넣어 주세요.', 'warn'); return; }
+    pickSeg('#segTable', L.table);
+    pickSeg('#segMy', L.myBall);
+    setBalls(L.balls, 'saved');
     $('#codeIn').value = '';
     toast('배치를 불러왔어요.', 'info');
   });
@@ -2075,6 +2188,7 @@ if (typeof module !== 'undefined') module.exports = Vision;
     $('#tabTips').hidden = tab !== 'tips';
     document.querySelector('.upload-actions').hidden = tab !== 'find';
     if (tab !== 'find') stopAnim();
+    if (tab !== 'score') Score.leave();
     else showView(state.view);
     if (tab === 'score') Score.render();
   }
@@ -2093,110 +2207,245 @@ if (typeof module !== 'undefined') module.exports = Vision;
 
   // ---------- 점수판 ----------
   const Score = (() => {
-    const KEY = 'cue3-score', HKEY = 'cue3-history';
-    const fresh = () => ({ scores: [0, 0], inn: [1, 0], high: [0, 0], run: 0, turn: 0, first: 0, last: false, done: false, started: Date.now() });
-    let g = fresh(), undo = [];
-    try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); if (v && v.g && Array.isArray(v.g.scores)) { g = v.g; for (const i of [0, 1]) { if (v.names) $('#scName' + i).value = v.names[i]; if (v.targets) $('#scT' + i).value = v.targets[i]; } } } catch (e) { /* 없음 */ }
-    const names = () => [0, 1].map(i => ($('#scName' + i).value || '').trim() || (i ? '선수 B' : '선수 A'));
-    const targets = () => [0, 1].map(i => Math.max(1, Math.min(200, parseInt($('#scT' + i).value, 10) || 20)));
-    const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ g, names: names(), targets: targets() })); } catch (e) { /* 무시 */ } };
+    const SC = Core.score;
+    const KEY = 'cue3-score2', HKEY = 'cue3-history';
+    let cfg = { players: [{ name: '선수 A', target: 20 }, { name: '선수 B', target: 20 }], limit: 0, clock: '0', voice: false, team: false };
+    let g = null, undo = [];
+    try {
+      const v = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (v && v.cfg && Array.isArray(v.cfg.players) && v.cfg.players.length) cfg = Object.assign(cfg, v.cfg);
+      if (v && v.g && Array.isArray(v.g.players)) g = v.g;
+    } catch (e) { /* 없음 */ }
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ cfg, g })); } catch (e) { /* 무시 */ } };
     const hist = () => { try { const a = JSON.parse(localStorage.getItem(HKEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
-    const avg = (sc, inn) => inn > 0 ? (sc / inn).toFixed(3) : '0.000';
-    const snap = () => { undo.push(JSON.stringify(g)); if (undo.length > 200) undo.shift(); };
+    const fmtAvg = p => SC.avg(p).toFixed(3);
+    const who = i => g.team ? `${g.players[i].name.split(/[,·/]/)[0].trim()}팀 ${SC.shooter(g.players[i])}` : g.players[i].name;
     const msg = t => { const m = $('#scMsg'); m.hidden = !t; m.textContent = t || ''; };
 
-    function finish() {
-      g.done = true;
-      const n = names(), t = targets();
-      const won = [0, 1].map(i => g.scores[i] >= t[i]);
-      const res = won[0] && won[1] ? '무승부' : won[0] ? `${n[0]} 승` : `${n[1]} 승`;
-      msg(`경기 끝 · ${res}. 새 경기를 누르면 다음 경기를 시작해요.`);
+    // 음성 · 소리 · 화면 켜짐
+    function say(t) {
+      if (!cfg.voice || !window.speechSynthesis) return;
+      try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'ko-KR'; u.rate = 1.05; speechSynthesis.speak(u); } catch (e) { /* 무시 */ }
+    }
+    let actx = null;
+    function beep(f, d) {
+      try {
+        actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+        const o = actx.createOscillator(), gn = actx.createGain();
+        o.frequency.value = f; gn.gain.value = 0.12; o.connect(gn); gn.connect(actx.destination);
+        o.start(); o.stop(actx.currentTime + d);
+      } catch (e) { /* 소리 없음 */ }
+      try { navigator.vibrate && navigator.vibrate(d * 1000); } catch (e) { /* 무시 */ }
+    }
+    let lock = null;
+    async function keepAwake(on) {
+      try {
+        if (on && !lock && navigator.wakeLock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); }
+        if (!on && lock) { await lock.release(); lock = null; }
+      } catch (e) { lock = null; }
+    }
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && g && !g.done) keepAwake(true); });
+
+    // 샷 클락
+    const clk = { left: 0, timer: 0, last: 0, ext: [] };
+    function clockReset() {
+      const n = +cfg.clock;
+      clearInterval(clk.timer);
+      $('#scClock').hidden = !n || !g || g.done;
+      if (!n || !g || g.done) return;
+      clk.left = n; clk.last = Math.ceil(n);
+      clk.timer = setInterval(clockTick, 100);
+      clockDraw();
+    }
+    function clockTick() {
+      clk.left = Math.max(0, clk.left - 0.1);
+      const s = Math.ceil(clk.left);
+      if (s !== clk.last) { clk.last = s; if (s <= 10 && s > 0) beep(880, 0.08); if (s === 0) { beep(440, 0.6); msg('시간 초과! 상대 차례로 넘기려면 공타를 누르세요.'); } }
+      if (clk.left <= 0) { clearInterval(clk.timer); }
+      clockDraw();
+    }
+    function clockDraw() {
+      const n = +cfg.clock || 1;
+      $('#scClockBar').style.width = (clk.left / n * 100) + '%';
+      $('#scClockNum').textContent = Math.ceil(clk.left);
+      $('#scClock').classList.toggle('warn', clk.left <= 10 && clk.left > 0);
+      $('#scClock').classList.toggle('over', clk.left <= 0);
+      $('#scExt').disabled = !g || !!clk.ext[g.turn];
+    }
+    $('#scExt').addEventListener('click', () => {
+      if (!g || clk.ext[g.turn]) return;
+      clk.ext[g.turn] = true; clk.left += +cfg.clock; clk.last = Math.ceil(clk.left); msg(''); clockDraw();
+      clearInterval(clk.timer); clk.timer = setInterval(clockTick, 100);
+    });
+
+    // 설정 화면
+    function renderSetup() {
+      $('#scCount').textContent = cfg.players.length;
+      $('#scMinus').disabled = cfg.players.length <= 1;
+      $('#scPlus').disabled = cfg.players.length >= 6;
+      $('#scPlayers').innerHTML = cfg.players.map((p, i) => `<div class="pl-row"><span class="idx">${i + 1}</span>
+        <input class="text-in" type="text" maxlength="12" data-i="${i}" data-k="name" value="${esc(p.name)}" aria-label="${i + 1}번 선수 이름">
+        <input class="num-in" type="number" inputmode="numeric" min="1" max="500" data-i="${i}" data-k="target" value="${p.target}" aria-label="${i + 1}번 선수 목표 점수"></div>`).join('');
+      $('#scLimit').value = cfg.limit;
+      $('#scVoice').checked = !!cfg.voice;
+      $('#scTeam').checked = !!cfg.team;
+      $('#scMinus').disabled = cfg.players.length <= (cfg.team ? 2 : 1);
+      [...$('#scClockSeg').children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === String(cfg.clock))));
+      $('#scStart').textContent = cfg.players.length === 1 ? '연습 시작' : '경기 시작';
+    }
+    $('#scPlayers').addEventListener('input', e => {
+      const t = e.target, i = +t.dataset.i; if (!cfg.players[i]) return;
+      cfg.players[i][t.dataset.k] = t.dataset.k === 'target' ? (parseInt(t.value, 10) || 20) : t.value;
+      save();
+    });
+    $('#scMinus').addEventListener('click', () => { if (cfg.players.length > (cfg.team ? 2 : 1)) { cfg.players.pop(); renderSetup(); save(); } });
+    $('#scPlus').addEventListener('click', () => {
+      if (cfg.players.length >= 6) return;
+      const last = cfg.players[cfg.players.length - 1];
+      cfg.players.push({ name: `선수 ${String.fromCharCode(65 + cfg.players.length)}`, target: last ? last.target : 20 });
+      renderSetup(); save();
+    });
+    $('#scLimit').addEventListener('input', e => { cfg.limit = Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0)); save(); });
+    $('#scTeam').addEventListener('change', e => {
+      cfg.team = e.target.checked;
+      if (cfg.team && cfg.players.length < 2) cfg.players.push({ name: '선수 B', target: cfg.players[0].target });
+      renderSetup(); save();
+    });
+    $('#scVoice').addEventListener('change', e => { cfg.voice = e.target.checked; save(); if (cfg.voice) say('음성 안내를 켰어요'); });
+    $('#scClockSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; cfg.clock = b.dataset.v; renderSetup(); save(); });
+    $('#scStart').addEventListener('click', () => {
+      g = SC.create(cfg.players, { limit: cfg.limit, team: cfg.team }); undo = []; clk.ext = [];
+      msg(''); keepAwake(true); render(); clockReset();
+      say(`${who(0)} 차례`);
+    });
+
+    // 경기 진행
+    const snap = () => { undo.push(JSON.stringify(g)); if (undo.length > 300) undo.shift(); };
+    function afterMove(prevTurn) {
+      if (g.done) return onDone();
+      if (g.turn !== prevTurn) {
+        const p = g.players[g.turn];
+        say(`${who(g.turn)} 차례, ${p.score}점`);
+        if (g.closing) msg(`목표 도달! 같은 이닝을 끝까지 돌려요. ${who(g.turn)} 차례.`);
+      }
+      render(); clockReset();
+    }
+    function onDone() {
+      const res = SC.result(g);
+      msg(`경기 끝 · ${res}`); say(`경기 끝, ${res}`);
       const a = hist();
-      a.unshift({ d: Date.now(), n, t, s: g.scores.slice(), i: g.inn.slice(), h: g.high.slice(), res });
-      try { localStorage.setItem(HKEY, JSON.stringify(a.slice(0, 100))); } catch (e) { /* 무시 */ }
+      a.unshift({ d: Date.now(), n: g.players.map(p => p.name), t: g.players.map(p => p.target), s: g.players.map(p => p.score), i: g.players.map(p => p.inn), h: g.players.map(p => p.high), res });
+      try { localStorage.setItem(HKEY, JSON.stringify(a.slice(0, 200))); } catch (e) { /* 무시 */ }
+      keepAwake(false); render(); clockReset();
     }
-    function hit() {
-      if (g.done) return;
-      snap();
-      const p = g.turn, t = targets();
-      g.scores[p]++; g.run++; g.high[p] = Math.max(g.high[p], g.run);
-      if (g.scores[p] >= t[p]) {
-        if (g.last || p !== g.first) finish();
-        else {
-          // 선구가 먼저 끝내면 후구에게 같은 이닝 기회
-          g.last = true; g.turn = 1 - p; g.run = 0; g.inn[g.turn]++;
-          msg(`${names()[p]} 목표 도달! ${names()[g.turn]}에게 마지막 이닝 기회가 있어요.`);
-        }
-      }
-      render();
+    $('#scHit').addEventListener('click', () => {
+      if (!g || g.done) return; snap();
+      const prev = g.turn; SC.hit(g);
+      if (g.turn === prev && !g.done) { const p = g.players[prev]; say(`${p.score}`); render(); clockReset(); }
+      else afterMove(prev);
+    });
+    $('#scMiss').addEventListener('click', () => { if (!g || g.done) return; snap(); const prev = g.turn; SC.miss(g); afterMove(prev); });
+    $('#scUndo').addEventListener('click', () => {
+      const v = undo.pop(); if (!v) return;
+      if (g && g.done) { const a = hist(); a.shift(); try { localStorage.setItem(HKEY, JSON.stringify(a)); } catch (e) { /* 무시 */ } keepAwake(true); }
+      g = JSON.parse(v); msg(g.closing ? '목표 도달 후 같은 이닝 진행 중이에요.' : ''); render(); clockReset();
+    });
+    $('#scNew').addEventListener('click', () => { g = null; undo = []; clearInterval(clk.timer); keepAwake(false); setFocus(false); msg(''); render(); });
+    function setFocus(on) {
+      document.body.classList.toggle('focus', on);
+      $('#scBig').textContent = on ? '작은 화면' : '큰 화면';
+      try { if (on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) { /* 무시 */ }
     }
-    function miss() {
-      if (g.done) return;
-      snap();
-      if (g.last) { finish(); render(); return; }
-      g.turn = 1 - g.turn; g.run = 0; g.inn[g.turn]++;
-      render();
+    $('#scBig').addEventListener('click', () => setFocus(!document.body.classList.contains('focus')));
+    function resultText() {
+      const d = new Date();
+      const lines = [`3쿠션 ${g.players.length === 1 ? '연습' : '경기'} ${d.getMonth() + 1}/${d.getDate()}`];
+      for (const s of SC.standings(g)) lines.push(`${s.p.name}  ${s.p.score}/${s.p.target}점  ${s.p.inn}이닝  에버 ${fmtAvg(s.p)}  하이런 ${s.p.high}`);
+      if (g.done) lines.push(SC.result(g));
+      return lines.join('\n');
     }
+    $('#scCopy').addEventListener('click', () => {
+      if (!g) return;
+      const t = resultText();
+      const ok = () => msg('결과를 복사했어요. 단톡이나 카페에 붙여 넣으세요.');
+      const fail = () => msg(t);
+      try { navigator.clipboard.writeText(t).then(ok, fail); } catch (e) { fail(); }
+    });
+
     function render() {
-      const n = names(), t = targets();
-      for (const i of [0, 1]) {
-        $('#scS' + i).textContent = g.scores[i];
-        $('#scI' + i).textContent = g.inn[i];
-        $('#scA' + i).textContent = avg(g.scores[i], g.inn[i]);
-        $('#scH' + i).textContent = g.high[i];
-        $('#scR' + i).textContent = g.turn === i && !g.done ? g.run : 0;
-        $('#scB' + i).style.width = Math.min(100, g.scores[i] / t[i] * 100) + '%';
-        $('#scP' + i).classList.toggle('on', g.turn === i && !g.done);
-      }
-      $('#scInfo').textContent = g.done ? '경기 끝' : `${Math.max(g.inn[0], g.inn[1])}이닝 · ${n[g.turn]} 차례${g.turn === g.first ? ' (선구)' : ''}`;
+      $('#scSetup').hidden = !!g; $('#scGame').hidden = !g;
+      if (!g) { renderSetup(); renderHist(); save(); return; }
+      const solo = g.players.length === 1;
+      $('#scTitle').textContent = solo ? '혼자 연습' : g.team ? `${g.players.length}팀 팀전` : `${g.players.length}인 경기`;
+      const cur = g.players[g.turn];
+      $('#scInfo').textContent = g.done ? '경기 끝' : `${g.round}이닝${g.limit ? ` / ${g.limit}` : ''} · ${who(g.turn)} 차례`;
+      const st = g.done ? SC.standings(g) : null;
+      $('#scBoard').innerHTML = g.players.map((p, i) => {
+        const on = i === g.turn && !g.done, won = g.done && st[0].i === i && !/무승부/.test(SC.result(g));
+        return `<div class="sc-p${on ? ' on' : ''}${won ? ' win' : ''}">
+          <div class="pname"><span>${esc(p.name)}</span>${on ? '<span class="badge">차례</span>' : won ? '<span class="badge good">승</span>' : ''}</div>
+          ${g.team && on ? `<div class="sub">칠 사람: <b>${esc(SC.shooter(p))}</b></div>` : ''}
+          <div class="sc-score"><b>${p.score}</b><span class="tgt">/ ${p.target}</span></div>
+          <div class="sc-bar"><i style="width:${Math.min(100, p.score / p.target * 100)}%"></i></div>
+          <div class="sc-stats"><span>이닝 <span class="num">${p.inn}</span></span><span>에버 <span class="num">${fmtAvg(p)}</span></span><span>하이런 <span class="num">${p.high}</span></span>${on ? `<span>연속 <span class="num">${g.run}</span></span>` : ''}</div>
+        </div>`;
+      }).join('');
       $('#scHit').disabled = $('#scMiss').disabled = g.done;
+      $('#scMiss').textContent = solo ? '공타 · 다음 이닝' : '공타 · 차례 넘기기';
       $('#scUndo').disabled = !undo.length;
-      $('#scSwap').disabled = g.scores[0] + g.scores[1] > 0 || g.inn[1] > 0;
+      // 이닝별 득점표
+      const R = Math.max(...g.players.map(p => p.log.length));
+      let h = '<table class="list log"><tr><th>선수</th>';
+      for (let r = 1; r <= R; r++) h += `<th class="r">${r}</th>`;
+      h += '<th class="r">계</th></tr>';
+      g.players.forEach((p, i) => {
+        h += `<tr><td>${esc(p.name)}</td>`;
+        for (let r = 0; r < R; r++) h += `<td class="r num${!g.done && i === g.turn && r === p.log.length - 1 ? ' cur' : ''}">${p.log[r] != null ? p.log[r] : ''}</td>`;
+        h += `<td class="r num"><b>${p.score}</b></td></tr>`;
+      });
+      $('#scLog').innerHTML = h + '</table>';
       renderHist(); save();
     }
     function renderHist() {
       const a = hist();
       const fmt = d => { const x = new Date(d); return `${x.getMonth() + 1}/${x.getDate()}`; };
-      $('#scHist').innerHTML = a.length ? `<table class="list"><tr><th>날짜</th><th>경기</th><th class="r">점수</th><th class="r">이닝</th><th>결과</th></tr>${a.slice(0, 20).map(r =>
-        `<tr><td>${fmt(r.d)}</td><td>${esc(r.n[0])} vs ${esc(r.n[1])}</td><td class="r num">${r.s[0]}/${r.t[0]} : ${r.s[1]}/${r.t[1]}</td><td class="r num">${Math.max(r.i[0], r.i[1])}</td><td>${esc(r.res)}</td></tr>`).join('')}</table>`
+      $('#scHist').innerHTML = a.length ? `<table class="list"><tr><th>날짜</th><th>선수 · 점수</th><th class="r">이닝</th><th>결과</th></tr>${a.slice(0, 20).map(r =>
+        `<tr><td>${fmt(r.d)}</td><td>${r.n.map((n, i) => `${esc(n)} <span class="num">${r.s[i]}/${r.t[i]}</span>`).join(' · ')}</td><td class="r num">${Math.max(...r.i)}</td><td>${esc(r.res)}</td></tr>`).join('')}</table>`
         : '<p class="sub" style="margin:0">끝난 경기가 여기에 쌓여요.</p>';
-      // 이름별 누적 에버리지
       const by = new Map();
-      for (const r of a) for (const i of [0, 1]) {
-        const k = r.n[i]; const o = by.get(k) || { g: 0, s: 0, i: 0, h: 0, w: 0, recent: [] };
-        o.g++; o.s += r.s[i]; o.i += r.i[i]; o.h = Math.max(o.h, r.h[i]); if (r.s[i] >= r.t[i] && r.s[1 - i] < r.t[1 - i]) o.w++;
-        if (o.recent.length < 10) { o.recent.push([r.s[i], r.i[i]]); }
+      for (const r of a) r.n.forEach((k, i) => {
+        const o = by.get(k) || { g: 0, s: 0, i: 0, h: 0, w: 0, recent: [] };
+        o.g++; o.s += r.s[i]; o.i += r.i[i]; o.h = Math.max(o.h, r.h[i]);
+        if (r.n.length > 1 && typeof r.res === 'string' && r.res === `${k} 승`) o.w++;
+        if (o.recent.length < 10) o.recent.push([r.s[i], r.i[i]]);
         by.set(k, o);
-      }
+      });
       const rows = [...by.entries()].sort((x, y) => y[1].g - x[1].g);
+      // 1:1 상대 전적
+      const h2h = new Map();
+      for (const r of a) if (r.n.length === 2 && r.n[0] !== r.n[1]) {
+        const [x, y] = [...r.n].sort(), key = x + '\u0000' + y, o = h2h.get(key) || { x, y, wx: 0, wy: 0, d: 0 };
+        if (r.res === `${x} 승`) o.wx++; else if (r.res === `${y} 승`) o.wy++; else o.d++;
+        h2h.set(key, o);
+      }
+      const h2hHtml = h2h.size ? `<span class="lbl">상대 전적</span><table class="list"><tr><th>대결</th><th class="r">승-무-패</th></tr>${[...h2h.values()].map(o => `<tr><td>${esc(o.x)} vs ${esc(o.y)}</td><td class="r num">${o.wx}-${o.d}-${o.wy}</td></tr>`).join('')}</table>` : '';
+      const av = (sc, inn) => inn > 0 ? (sc / inn).toFixed(3) : '0.000';
       $('#scMine').innerHTML = rows.length ? `<table class="list"><tr><th>이름</th><th class="r">경기</th><th class="r">승</th><th class="r">전체 에버</th><th class="r">최근 10경기</th><th class="r">하이런</th></tr>${rows.map(([k, o]) => {
         const rs = o.recent.reduce((q, v) => [q[0] + v[0], q[1] + v[1]], [0, 0]);
-        return `<tr><td>${esc(k)}</td><td class="r num">${o.g}</td><td class="r num">${o.w}</td><td class="r num">${avg(o.s, o.i)}</td><td class="r num">${avg(rs[0], rs[1])}</td><td class="r num">${o.h}</td></tr>`;
-      }).join('')}</table>` : '<p class="sub" style="margin:0">경기를 끝내면 이름별 에버리지와 하이런이 정리돼요.</p>';
+        return `<tr><td>${esc(k)}</td><td class="r num">${o.g}</td><td class="r num">${o.w}</td><td class="r num">${av(o.s, o.i)}</td><td class="r num">${av(rs[0], rs[1])}</td><td class="r num">${o.h}</td></tr>`;
+      }).join('')}</table>${h2hHtml}` : '<p class="sub" style="margin:0">경기를 끝내면 이름별 에버리지와 하이런이 정리돼요.</p>';
     }
-    $('#scHit').addEventListener('click', hit);
-    $('#scMiss').addEventListener('click', miss);
-    $('#scUndo').addEventListener('click', () => {
-      const v = undo.pop(); if (!v) return;
-      const wasDone = g.done; g = JSON.parse(v);
-      if (wasDone && !g.done) {
-        // 끝난 경기를 되돌리면 기록에서도 뺌
-        const a = hist(); a.shift(); try { localStorage.setItem(HKEY, JSON.stringify(a)); } catch (e) { /* 무시 */ }
-      }
-      msg(g.last ? '후구 마지막 이닝 중이에요.' : ''); render();
-    });
-    $('#scSwap').addEventListener('click', () => { snap(); g.first = 1 - g.first; g.turn = g.first; g.inn = g.first ? [0, 1] : [1, 0]; render(); });
-    $('#scNew').addEventListener('click', () => { const f = g.first; g = fresh(); g.first = f; g.turn = f; g.inn = f ? [0, 1] : [1, 0]; undo = []; msg(''); render(); });
     $('#scClear').addEventListener('click', e => {
       const b = e.currentTarget;
       if (b.dataset.armed) { try { localStorage.removeItem(HKEY); } catch (err) { /* 무시 */ } delete b.dataset.armed; b.textContent = '기록 지우기'; renderHist(); return; }
       b.dataset.armed = '1'; b.textContent = '한 번 더 누르면 지워요';
       setTimeout(() => { delete b.dataset.armed; b.textContent = '기록 지우기'; }, 3000);
     });
-    for (const id of ['#scName0', '#scName1', '#scT0', '#scT1']) $(id).addEventListener('input', render);
-    if (g.done) msg('지난 경기가 끝난 상태예요. 새 경기를 눌러 시작하세요.');
-    else if (g.last) msg('후구 마지막 이닝 중이에요.');
-    return { render };
+    if (g && g.done) msg(`지난 경기 결과 · ${SC.result(g)}`);
+    return {
+      render: () => { render(); if (g && !g.done && +cfg.clock && !clk.timer) clockReset(); },
+      leave: () => { setFocus(false); clearInterval(clk.timer); clk.timer = 0; }
+    };
   })();
 
   // ---------- 시작 ----------

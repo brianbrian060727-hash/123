@@ -1,0 +1,10 @@
+{
+  "name": "cue3-guide",
+  "private": true,
+  "description": "3쿠션 길잡이 — 단일 HTML 페이지",
+  "scripts": {
+    "test": "node --test tests/unit.test.js",
+    "test:e2e": "node --test tests/e2e.test.js",
+    "test:all": "node --test tests/unit.test.js tests/e2e.test.js"
+  }
+}
