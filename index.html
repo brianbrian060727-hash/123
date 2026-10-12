@@ -166,13 +166,66 @@ details.settings summary { padding: 12px 14px; font-weight: 700; cursor: pointer
 details.settings summary::-webkit-details-marker { display: none; }
 details.settings summary::after { content: "+"; font-family: var(--f-num); color: var(--muted); }
 details.settings[open] summary::after { content: "−"; }
-.set-body { padding: 0 14px 14px; display: grid; gap: 12px; }
+.set-body { padding: 0 14px 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .set-row label { font-size: 14px; font-weight: 600; }
 .set-row .sub { display: block; font-weight: 400; }
 input[type="range"] { width: 170px; accent-color: var(--accent); }
 
 .corner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* 탭 */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tabs button { border: 0; background: none; padding: 10px 12px; font-weight: 700; font-size: 14.5px; color: var(--muted); border-bottom: 2.5px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.col { display: flex; flex-direction: column; gap: 14px; }
+.text-in { flex: 1 1 160px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-size: 16px; }
+.text-in.mono { font-family: var(--f-num); font-size: 14px; }
+.row-inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tipbox { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; display: grid; gap: 6px; }
+.tipbox b { color: var(--brass); font-weight: 700; margin-right: 4px; }
+.list { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.list th, .list td { padding: 8px 6px; border-top: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.list th { color: var(--muted); font-weight: 600; font-size: 12px; border-top: 0; }
+.list td.r, .list th.r { text-align: right; }
+.scroll-x { overflow-x: auto; }
+.mini { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 4px 9px; font-size: 12.5px; font-weight: 600; min-height: 32px; }
+.mini.del { color: var(--bad); }
+.hide-ans { display: grid; gap: 10px; justify-items: start; }
+
+/* 점수판 */
+.sc-board { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sc-p { border: 1.5px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sc-p.on { border-color: var(--accent); background: var(--accent-soft); }
+.sc-p .name { border: 0; border-bottom: 1px dashed var(--line); background: transparent; font-weight: 700; font-size: 16px; width: 100%; padding: 2px 0; }
+.sc-score { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.sc-score b { font-family: var(--f-display); font-weight: 400; font-size: 56px; line-height: 1; font-variant-numeric: tabular-nums; }
+.sc-score label { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.sc-score input { width: 58px; border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; background: var(--surface); font-family: var(--f-num); font-size: 16px; }
+.sc-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.sc-bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width 0.2s; }
+.sc-stats { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.sc-stats .num { color: var(--ink); }
+.sc-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn.big { min-height: 58px; font-size: 16px; border-radius: 14px; }
+.btn.good { background: var(--good); border-color: var(--good); color: #fff; }
+
+/* 꿀팁 */
+details.tip { border-top: 1px solid var(--line); }
+details.tip:first-of-type { border-top: 0; }
+details.tip summary { padding: 11px 0; font-weight: 700; cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 8px; }
+details.tip summary::-webkit-details-marker { display: none; }
+details.tip summary::after { content: "+"; font-family: var(--f-num); color: var(--muted); }
+details.tip[open] summary::after { content: "−"; }
+details.tip ul, details.tip dl { margin: 0 0 14px; padding-left: 18px; display: grid; gap: 9px; font-size: 14px; max-width: 65ch; }
+details.tip dl { padding-left: 0; }
+details.tip dt { font-weight: 700; }
+details.tip dd { margin: 0 0 4px; color: var(--muted); }
+.calc { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+.field input { width: 100px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-family: var(--f-num); font-size: 18px; color: var(--ink); }
+.calc .op { font-family: var(--f-num); font-size: 20px; color: var(--muted); padding-bottom: 8px; }
+.calc-out { font-family: var(--f-display); font-size: 40px; line-height: 1; color: var(--accent); padding-bottom: 2px; }
 .note { font-size: 12.5px; color: var(--muted); margin: 0; max-width: 65ch; }
 .toast { font-size: 13px; padding: 9px 12px; border-radius: 10px; background: color-mix(in srgb, var(--warn) 14%, var(--surface)); color: var(--ink); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); margin: 0; }
 .toast.info { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
@@ -192,6 +245,13 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
       </div>
     </div>
   </header>
+  <nav class="tabs" role="tablist" aria-label="화면">
+    <button type="button" role="tab" id="tabBtnFind" data-tab="find" aria-selected="true">길 찾기</button>
+    <button type="button" role="tab" id="tabBtnScore" data-tab="score" aria-selected="false">점수판</button>
+    <button type="button" role="tab" id="tabBtnTips" data-tab="tips" aria-selected="false">꿀팁 · 시스템</button>
+  </nav>
+  <p class="toast" id="toast" hidden></p>
+  <div id="tabFind" class="col">
   <button type="button" class="linkish" id="btnHelp">사진이 안 올라가요?</button>
 
   <section id="uploadHelp" class="panel" hidden>
@@ -204,8 +264,6 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
       <li><b>복사해서 붙여넣기 (PC)</b><span>사진을 복사한 뒤 아래 칸을 누르고 붙여넣기 하세요. 사진 파일을 이 페이지로 끌어다 놓아도 돼요.</span><div id="pasteBox" class="paste-box" contenteditable="true" role="textbox" aria-label="사진 붙여넣기 칸"></div></li>
     </ol>
   </section>
-
-  <p class="toast" id="toast" hidden></p>
 
   <!-- 코너 맞추기 -->
   <section id="viewCorner" class="panel" hidden>
@@ -239,6 +297,7 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
 
     <div id="recPanel" class="panel">
       <div class="panel-head"><h2>추천 길</h2><span class="sub" id="recSub"></span></div>
+      <label class="row-inline sub" for="hideIn"><input type="checkbox" id="hideIn"> 연습: 정답 가리고 먼저 생각해 보기</label>
       <div class="chips" id="solChips" role="group" aria-label="추천 공략 목록"></div>
       <div id="solDetail"></div>
     </div>
@@ -268,6 +327,27 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
       </div>
       <table class="kv" id="aimTable"></table>
     </div>
+
+    <details class="settings" id="layoutBox">
+      <summary>배치 문제집 · 공유</summary>
+      <div class="set-body">
+        <div class="row-inline"><button type="button" class="btn" id="btnRandom">무작위 배치</button><span class="sub">연습용으로 세 공을 아무 데나 놓아요</span></div>
+        <div class="row-inline">
+          <input class="text-in" id="saveName" type="text" maxlength="30" placeholder="배치 이름 (예: 지난주 놓친 공)" aria-label="배치 이름">
+          <button type="button" class="btn primary" id="btnSaveLayout">지금 배치 저장</button>
+        </div>
+        <div id="savedList"></div>
+        <div class="set-row"><label for="codeOut">배치 코드<span class="sub">카페·단톡에 붙여 넣으면 같은 배치를 열 수 있어요</span></label></div>
+        <div class="row-inline">
+          <input class="text-in mono" id="codeOut" type="text" readonly aria-label="현재 배치 코드">
+          <button type="button" class="btn" id="btnCopyCode">복사</button>
+        </div>
+        <div class="row-inline">
+          <input class="text-in mono" id="codeIn" type="text" placeholder="3C-D-W-…" aria-label="받은 배치 코드">
+          <button type="button" class="btn" id="btnLoadCode">코드로 불러오기</button>
+        </div>
+      </div>
+    </details>
   </section>
 
   <details class="settings" id="settings">
@@ -281,6 +361,8 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
         <input type="range" id="spinIn" min="0.6" max="1.4" step="0.05" value="1"></div>
       <div class="set-row"><label>테이블 속도<span class="sub">공이 잘 구르면 빠름</span></label>
         <div class="seg" id="segSpeed"><button type="button" data-v="slow">느림</button><button type="button" data-v="mid">보통</button><button type="button" data-v="fast">빠름</button></div></div>
+      <div class="set-row"><label>샷 보기 속도<span class="sub">느리게 보면 키스 순간이 잘 보여요</span></label>
+        <div class="seg" id="segPlay"><button type="button" data-v="0.35">아주 느리게</button><button type="button" data-v="0.6">느리게</button><button type="button" data-v="1">실제</button></div></div>
       <div class="set-row"><label>사진 배경</label>
         <div class="seg" id="segBg"><button type="button" data-v="on">보기</button><button type="button" data-v="off">끄기</button></div></div>
       <div class="set-row"><button class="btn" type="button" id="btnSample">예시 배치로 돌아가기</button><button class="btn" type="button" id="btnCorners">코너 다시 맞추기</button></div>
@@ -288,6 +370,119 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
   </details>
 
   <p class="note">찍는 법: 테이블 가운데 바로 위에서, 네 모서리가 모두 나오게 찍으세요. 길은 쿠션 반발·회전·마찰을 단순화한 모델로 계산한 추천이라 테이블마다 조금씩 다릅니다. 몇 번 쳐 보고 보정에서 회전 효과와 테이블 속도를 맞춰 쓰세요. 포인트는 화면 기준으로 장쿠션 왼쪽 끝 0 → 오른쪽 끝 8, 단쿠션 위 0 → 아래 4입니다. 샷 보기는 계산한 길을 실제 속도로 굴려 보여 주고, 공 배치는 이 기기에 기억돼요.</p>
+  </div>
+
+  <!-- 점수판 -->
+  <section id="tabScore" class="col" hidden>
+    <div class="panel">
+      <div class="panel-head"><h2>3쿠션 점수판</h2><span class="sub" id="scInfo"></span></div>
+      <div class="sc-board">
+        <div class="sc-p" id="scP0">
+          <input class="name" id="scName0" type="text" maxlength="12" value="선수 A" aria-label="선수 A 이름">
+          <div class="sc-score"><b id="scS0">0</b><label>/ <input id="scT0" type="number" inputmode="numeric" min="1" max="200" value="20" aria-label="선수 A 목표 점수"></label></div>
+          <div class="sc-bar"><i id="scB0"></i></div>
+          <div class="sc-stats"><span>이닝 <span class="num" id="scI0">0</span></span><span>에버 <span class="num" id="scA0">0.000</span></span><span>하이런 <span class="num" id="scH0">0</span></span><span>연속 <span class="num" id="scR0">0</span></span></div>
+        </div>
+        <div class="sc-p" id="scP1">
+          <input class="name" id="scName1" type="text" maxlength="12" value="선수 B" aria-label="선수 B 이름">
+          <div class="sc-score"><b id="scS1">0</b><label>/ <input id="scT1" type="number" inputmode="numeric" min="1" max="200" value="20" aria-label="선수 B 목표 점수"></label></div>
+          <div class="sc-bar"><i id="scB1"></i></div>
+          <div class="sc-stats"><span>이닝 <span class="num" id="scI1">0</span></span><span>에버 <span class="num" id="scA1">0.000</span></span><span>하이런 <span class="num" id="scH1">0</span></span><span>연속 <span class="num" id="scR1">0</span></span></div>
+        </div>
+      </div>
+      <div class="sc-actions">
+        <button type="button" class="btn big good" id="scHit">+1 득점</button>
+        <button type="button" class="btn big" id="scMiss">공타 · 차례 넘기기</button>
+      </div>
+      <div class="row-inline">
+        <button type="button" class="btn sm" id="scUndo">되돌리기</button>
+        <button type="button" class="btn sm" id="scSwap">선구 바꾸기</button>
+        <button type="button" class="btn sm" id="scNew">새 경기</button>
+      </div>
+      <p class="toast info" id="scMsg" hidden></p>
+      <p class="note">점수는 득점할 때마다 +1, 못 맞히면 공타를 눌러 차례를 넘기세요. 에버리지는 점수 ÷ 이닝입니다. 선구가 먼저 목표에 닿으면 후구에게 같은 이닝 기회를 한 번 더 줍니다.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>내 기록</h2><span class="sub">이 기기에 저장된 경기 기준</span></div>
+      <div class="scroll-x" id="scMine"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>최근 경기</h2><button type="button" class="mini del" id="scClear">기록 지우기</button></div>
+      <div class="scroll-x" id="scHist"></div>
+    </div>
+  </section>
+
+  <!-- 꿀팁 · 시스템 -->
+  <section id="tabTips" class="col" hidden>
+    <div class="panel">
+      <div class="panel-head"><h2>파이브앤하프 계산기</h2><span class="sub">수구 수 − 3쿠션 수 = 1쿠션 겨냥 수</span></div>
+      <div class="calc">
+        <label class="field" for="fhCue">수구 수<input id="fhCue" type="number" inputmode="decimal" step="5" value="50"></label>
+        <span class="op">−</span>
+        <label class="field" for="fhArr">3쿠션 도착 수<input id="fhArr" type="number" inputmode="decimal" step="5" value="20"></label>
+        <span class="op">=</span>
+        <div class="field">1쿠션 겨냥<span class="calc-out" id="fhOut">30</span></div>
+      </div>
+      <p class="sub" id="fhNote"></p>
+      <div class="tipbox">
+        <div><b>기준</b>코너에서 출발하는 수구 수가 50입니다. 코너 50에서 1쿠션 30을 겨냥하면 3쿠션 20에 도착하는 것이 기준 샷이에요.</div>
+        <div><b>당점</b>시스템 수치는 보통 상단 회전 2~3팁, 부드러운 중간 힘을 기준으로 합니다. 당점과 힘을 매번 같게 해야 수치가 맞아요.</div>
+        <div><b>보정</b>구장마다 쿠션과 천 상태가 달라 같은 수로 쳐도 도착점이 밀립니다. 코너 50 기준 샷을 몇 번 쳐서 도착점이 어디로 가는지 보고, 그만큼 더하거나 빼서 쓰세요.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>꿀팁 모음</h2><span class="sub">동호인들이 자주 묻는 것 위주</span></div>
+      <div>
+        <details class="tip" open><summary>두께 · 조준</summary><ul>
+          <li><b>두께는 수구 중심이 아니라 가상의 공(고스트볼)으로 겨냥</b>하세요. 맞는 순간 수구가 놓일 자리를 그려 놓고 그 중심을 보고 칩니다.</li>
+          <li><b>옆회전을 주면 수구가 반대쪽으로 살짝 밀려 나가요(스쿼트).</b> 회전을 많이 줄수록 두께가 두꺼워지기 쉬우니 조금 더 얇게 겨냥합니다.</li>
+          <li><b>먼 거리에서는 회전 때문에 공이 휘어요(커브).</b> 강하게 치면 덜 휘고, 약하게 치면 더 휘어 두께가 바뀝니다.</li>
+          <li>얇은 두께(1/4 이하)는 실수 폭이 좁습니다. 같은 길이 두꺼운 두께로도 나오면 그쪽을 고르세요. 앱의 허용 오차 숫자가 이걸 알려 줘요.</li>
+        </ul></details>
+        <details class="tip"><summary>당점 · 회전</summary><ul>
+          <li><b>1팁은 공 반지름의 약 1/6.</b> 3팁이 넘어가면 미스큐가 잘 나니 초크를 꼭 칠하세요.</li>
+          <li><b>상단은 밀고, 하단은 끕니다.</b> 적구를 맞힌 뒤 수구가 앞으로 따라가게 하려면 상단, 뒤로 빼려면 하단입니다. 끌어치기는 거리가 멀수록 효과가 줄어요.</li>
+          <li><b>회전은 쿠션을 맞을 때 각을 바꿉니다.</b> 오른쪽 회전이면 쿠션을 맞고 오른쪽으로 더 벌어져요. 회전이 덜 먹는 테이블이면 설정의 회전 효과를 낮추세요.</li>
+          <li>회전은 이동 거리에 따라 줄어듭니다. 3쿠션 뒤까지 회전을 살리려면 힘을 조금 더 주세요.</li>
+        </ul></details>
+        <details class="tip"><summary>스트로크 · 힘</summary><ul>
+          <li><b>힘은 세기보다 일정함이 먼저</b>입니다. 같은 길을 같은 힘으로 10번 쳐서 도착점이 모이는지 확인하세요.</li>
+          <li>백스트로크는 천천히, 임팩트 후에는 큐를 공 지나 10~15cm 밀어 줍니다. 큐를 멈추면 회전이 덜 들어가요.</li>
+          <li>그립은 가볍게. 꽉 쥐면 큐 끝이 흔들려 당점이 틀어집니다.</li>
+          <li>3쿠션은 대부분 중간 힘이면 충분합니다. 힘이 세면 두께 오차가 커지고 키스도 늘어요.</li>
+        </ul></details>
+        <details class="tip"><summary>키스 피하기</summary><ul>
+          <li>키스는 수구와 1적구가 다시 만나는 것. <b>샷 보기를 느리게</b> 틀어 두 공이 지나가는 타이밍을 확인하세요.</li>
+          <li>피하는 법은 세 가지: 두께를 바꾸거나, 힘을 바꿔 지나가는 시간을 어긋나게 하거나, 아예 다른 길을 고르기.</li>
+          <li>정면에 가까운 두꺼운 두께에서 1적구가 쿠션을 맞고 돌아올 때 키스가 가장 많이 나요.</li>
+        </ul></details>
+        <details class="tip"><summary>테이블 상태 읽기</summary><ul>
+          <li>첫 큐 전에 <b>코너 50 기준 샷</b> 하나로 그날 테이블의 길이를 확인하세요. 길게 빠지면 미끄러운 테이블, 짧으면 뻑뻑한 테이블입니다.</li>
+          <li>새 천은 공이 잘 미끄러져 길이 길어지고, 습한 날은 짧아집니다. 앱에서는 설정의 테이블 속도와 회전 효과로 맞춰요.</li>
+          <li>공이 더러우면 키스와 미끄러짐이 늘어요. 경기 전 공을 닦아 달라고 해도 실례가 아닙니다.</li>
+        </ul></details>
+        <details class="tip"><summary>연습 · 멘탈</summary><ul>
+          <li>앱의 <b>무작위 배치 + 정답 가리기</b>로 먼저 길을 골라 보고, 맞춰 보며 길 보는 눈을 키우세요.</li>
+          <li>놓친 공은 <b>배치 문제집에 저장</b>해 두었다가 다음에 다시 쳐 보세요.</li>
+          <li>에버리지는 한 경기보다 최근 10경기 흐름으로 보세요. 점수판 기록이 이 기기에 쌓입니다.</li>
+          <li>어려운 공에서는 득점보다 다음 배치를 남기는 수비(디펜스)도 생각합니다. 수구나 상대 공을 쿠션 가까이 붙이면 상대가 치기 어려워요.</li>
+        </ul></details>
+        <details class="tip"><summary>용어 사전</summary><dl>
+          <dt>수구 · 1적구 · 2적구</dt><dd>내가 치는 공, 먼저 맞히는 공, 마지막에 맞혀야 하는 공.</dd>
+          <dt>두께</dt><dd>수구가 적구를 얼마나 겹쳐 맞히는지. 정면이 1, 반만 겹치면 1/2 두께.</dd>
+          <dt>당점 · 팁</dt><dd>큐로 수구를 치는 위치. 가운데에서 옆으로 1팁, 2팁… 하고 셉니다.</dd>
+          <dt>돌리기 (옆·앞·뒤돌리기)</dt><dd>적구를 맞힌 뒤 장쿠션-단쿠션-장쿠션으로 돌아 나오는 길. 적구의 어느 쪽을 맞히는지에 따라 앞돌리기, 뒤돌리기, 옆돌리기로 나눠 부릅니다.</dd>
+          <dt>대회전</dt><dd>테이블을 크게 한 바퀴 돌며 양쪽 단쿠션을 모두 거치는 길.</dd>
+          <dt>빗겨치기</dt><dd>적구를 얇게 맞혀 단쿠션부터 먼저 보내는 길.</dd>
+          <dt>횡단샷</dt><dd>장쿠션에서 맞은편 장쿠션으로 테이블을 가로지르는 길.</dd>
+          <dt>빈쿠션 · 뱅크샷</dt><dd>적구보다 쿠션을 먼저 맞히는 샷. 쿠션 세 번을 먼저 맞히면 뱅크샷이라고 부릅니다.</dd>
+          <dt>키스</dt><dd>의도하지 않게 공끼리 다시 부딪히는 것.</dd>
+          <dt>이닝 · 에버리지 · 하이런</dt><dd>한 번 차례가 온 횟수, 점수 ÷ 이닝, 한 이닝에 연속으로 낸 최고 점수.</dd>
+        </dl></details>
+      </div>
+    </div>
+  </section>
 </div>
 
 <script id="engine-src">
@@ -882,7 +1077,7 @@ if (typeof module !== 'undefined') module.exports = Vision;
   const SAMPLE = { white: { x: 0.75, y: 0.95 }, red: { x: 1.55, y: 0.62 }, yellow: { x: 2.35, y: 1.15 } };
 
   const state = {
-    table: 'daedae', myBall: 'white', spinGain: 1, speed: 'mid', showPhoto: true,
+    table: 'daedae', myBall: 'white', spinGain: 1, speed: 'mid', showPhoto: true, playSpeed: '0.6', hideAns: false, revealed: false,
     balls: JSON.parse(JSON.stringify(SAMPLE)),
     source: 'sample', detect: null,
     mode: 'rec', sols: [], sel: 0, solving: false, solveId: 0,
@@ -891,10 +1086,10 @@ if (typeof module !== 'undefined') module.exports = Vision;
   };
   try {
     const s = JSON.parse(localStorage.getItem('cue3-settings') || '{}');
-    for (const k of ['table', 'myBall', 'spinGain', 'speed', 'showPhoto']) if (s[k] !== undefined) state[k] = s[k];
+    for (const k of ['table', 'myBall', 'spinGain', 'speed', 'showPhoto', 'playSpeed', 'hideAns']) if (s[k] !== undefined) state[k] = s[k];
   } catch (e) { /* 저장소 없음 */ }
   function saveSettings() {
-    try { localStorage.setItem('cue3-settings', JSON.stringify({ table: state.table, myBall: state.myBall, spinGain: state.spinGain, speed: state.speed, showPhoto: state.showPhoto })); } catch (e) { /* 무시 */ }
+    try { localStorage.setItem('cue3-settings', JSON.stringify({ table: state.table, myBall: state.myBall, spinGain: state.spinGain, speed: state.speed, showPhoto: state.showPhoto, playSpeed: state.playSpeed, hideAns: state.hideAns })); } catch (e) { /* 무시 */ }
   }
 
   // 마지막 공 배치 기억 (같은 테이블 크기일 때만)
@@ -920,7 +1115,14 @@ if (typeof module !== 'undefined') module.exports = Vision;
   }
   function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
-  function toast(msg, kind) { const t = $('#toast'); if (!msg) { t.hidden = true; return; } t.textContent = msg; t.className = 'toast' + (kind === 'info' ? ' info' : ''); t.hidden = false; }
+  let toastTimer = 0;
+  function toast(msg, kind) {
+    const t = $('#toast'); clearTimeout(toastTimer);
+    if (!msg) { t.hidden = true; return; }
+    t.textContent = msg; t.className = 'toast' + (kind === 'info' ? ' info' : ''); t.hidden = false;
+    // 짧은 안내는 잠시 뒤 저절로 닫힘
+    if (kind === 'info' && !msg.endsWith('…')) toastTimer = setTimeout(() => { t.hidden = true; }, 4000);
+  }
 
   // ---------- 계산(워커) ----------
   let worker = null;
@@ -939,14 +1141,14 @@ if (typeof module !== 'undefined') module.exports = Vision;
     }, 20);
   }
   function requestSolve() {
-    stopAnim();
+    stopAnim(); if (typeof renderCode === 'function') renderCode();
     state.solving = true; state.solveId++;
     renderStatus(); renderRec();
     if (worker) worker.postMessage({ id: state.solveId, o: ctxObj() });
     else solveMain(state.solveId);
   }
   function finishSolve(list) {
-    state.sols = list; state.sel = 0; state.solving = false;
+    state.sols = list; state.sel = 0; state.solving = false; state.revealed = false;
     renderStatus(); renderRec(); drawTable();
   }
 
@@ -996,6 +1198,37 @@ if (typeof module !== 'undefined') module.exports = Vision;
     const h = Engine.railHit(Engine.makeCtx(ctxObj()), rec.theta);
     return h ? `<div class="sub">겨냥선을 쭉 이으면 ${RAILNAME[h.rail]}쿠션 <span class="num">${railPoint(h)}</span> 포인트</div>` : '';
   }
+  // 한국식 길 이름: 쿠션 순서로 판단 (장=장쿠션, 단=단쿠션)
+  function routeName(rec) {
+    const bi = rec.evs.findIndex(e => e.type === 'b');
+    if (bi >= 3) return { name: '뱅크샷', seq: '' };
+    const rails = rec.evs.filter((e, i) => e.type === 'c' && i > bi).map(e => e.rail);
+    const seq = rails.slice(0, 4).map(r => (r === 0 || r === 2) ? '장' : '단').join('-');
+    if (bi > 0) return { name: `빈쿠션 ${bi}쿠션`, seq };
+    const first4 = rails.slice(0, 4);
+    let name;
+    if (first4.includes(1) && first4.includes(3)) name = '대회전';
+    else if (seq.startsWith('장-장')) name = '횡단샷';
+    else if (seq.startsWith('단')) name = '빗겨치기';
+    else if (seq.startsWith('장-단-장')) name = '돌리기';
+    else name = '쿠션 길';
+    return { name, seq };
+  }
+  function routeTips(s) {
+    const out = [], rec = s.rec, c = rec.contact;
+    const bi = rec.evs.findIndex(e => e.type === 'b');
+    if (s.tolMM < 7) out.push(['정확도', '허용 오차가 작아요. 힘보다 두께를 먼저 맞추고 스트로크를 짧고 곧게 가져가세요.']);
+    if (bi > 0) out.push(['빈쿠션', '쿠션 지점을 보고 칩니다. 회전을 주면 1쿠션 반사각이 달라지니 당점을 정확히 지키세요.']);
+    if (c && c.thick < 0.25 && bi === 0) out.push(['얇은 두께', '회전 때문에 수구가 밀려 두께가 두꺼워지기 쉬워요. 생각보다 살짝 얇게 겨냥하세요.']);
+    if (c && c.thick > 0.7 && bi === 0) out.push(['두꺼운 두께', '수구가 많이 죽어요. 상단으로 밀어 주거나 힘을 한 단계 올려 길을 살리세요.']);
+    if (Engine.VERT[s.vk].key === 'low') out.push(['끌어치기', '하단은 거리가 멀수록 효과가 줄어요. 큐를 낮고 길게 밀어 주세요.']);
+    if (Math.abs(s.E) >= 3) out.push(['3팁 회전', '미스큐가 잘 나는 당점이에요. 초크를 칠하고, 쿠션 뒤 각이 크게 벌어지는 걸 감안하세요.']);
+    if (s.pw.lv >= 4) out.push(['큰 힘', '세게 칠수록 두께 오차가 커져요. 브리지를 단단히 하고 팔로우를 끝까지.']);
+    if (s.risk.kiss) out.push(['키스', '샷 보기를 느리게 틀어 두 공이 스치는 순간을 보세요. 두께나 힘을 조금 바꾸면 피할 수 있어요.']);
+    if (s.risk.objHit) out.push(['적구 충돌', '1적구가 2적구를 건드려 자리가 바뀔 수 있어요. 1적구 힘을 줄이는 두께를 고르세요.']);
+    if (!out.length) out.push(['기본', '같은 당점, 같은 힘으로 일정하게. 이 길은 무리 없는 길이에요.']);
+    return out.slice(0, 3);
+  }
   function shotType(rec) {
     const bi = rec.evs.findIndex(e => e.type === 'b');
     if (bi === 0) return '공 먼저';
@@ -1043,11 +1276,18 @@ if (typeof module !== 'undefined') module.exports = Vision;
       det.innerHTML = '<p class="empty">이 배치에서는 3쿠션 길을 찾지 못했어요. 공 위치가 맞는지 확인하거나, 보정에서 테이블 속도를 빠름으로 바꿔 보세요.</p>';
       return;
     }
+    if (state.hideAns && !state.revealed) {
+      chips.innerHTML = '';
+      det.innerHTML = `<div class="hide-ans"><p class="empty">득점 길을 ${state.sols.length}가지 찾았어요. 직접 조준에서 먼저 쳐 보거나 머릿속으로 길을 그려 본 뒤 정답을 확인하세요.</p><button type="button" class="btn primary" id="btnReveal">정답 보기</button></div>`;
+      $('#btnReveal').addEventListener('click', () => { state.revealed = true; renderRec(); drawTable(); });
+      return;
+    }
     chips.innerHTML = state.sols.map((s, i) => {
       const d = diff(s.tolMM);
       const first = BALLNAME[objKey(s.rec.contact.idx)];
       const bi = s.rec.evs.findIndex(e => e.type === 'b');
-      const title = bi === 0 ? `${first} 먼저` : shotType(s.rec);
+      const rn = routeName(s.rec);
+      const title = bi === 0 ? `${first} · ${rn.name}` : rn.name;
       const tipS = s.E === 0 ? Engine.VERT[s.vk].label : `${s.E > 0 ? '우' : '좌'}${Math.abs(s.E)}팁 ${Engine.VERT[s.vk].label}`;
       return `<button type="button" class="chip" data-i="${i}" aria-pressed="${i === state.sel}">
         <span class="n"><span class="lvl ${d.cls}"></span>길 ${i + 1}</span>
@@ -1068,13 +1308,14 @@ if (typeof module !== 'undefined') module.exports = Vision;
     if (s.risk.objHit) risks.push('<span class="tag warn">적구끼리 부딪힐 수 있음</span>');
     if (!risks.length) risks.push('<span class="tag good">특이 위험 없음</span>');
     det.innerHTML = `<table class="kv">
-      <tr><th>길</th><td>${routeHTML(s.rec)}</td></tr>
+      <tr><th>길</th><td><b>${routeName(s.rec).name}</b> <span class="sub">${routeName(s.rec).seq}</span>${routeHTML(s.rec)}</td></tr>
       <tr><th>겨냥</th><td>${aim}</td></tr>
       <tr><th>당점</th><td><div class="tipcell">${tipSvg(s.E, s.vk, 44)}<span>${tipText(s.E, s.vk)}</span></div></td></tr>
       <tr><th>힘</th><td>${pipsHTML(s.pw.lv)}<b>${s.pw.lv}단계 · ${s.pw.label}</b><div class="sub">수구 초속 약 <span class="num">${s.V0.toFixed(1)}</span> m/s · 두 번째 공까지 여유 있게 닿는 힘</div></td></tr>
       <tr><th>허용 오차</th><td><span class="num">±${s.tolMM.toFixed(0)} mm</span> <span class="tag ${d.tag}">${d.t}</span><div class="sub">첫 목표 지점에서 이만큼 벗어나도 득점</div></td></tr>
       <tr><th>위험</th><td>${risks.join(' ')}</td></tr>
-    </table>`;
+    </table>
+    <div class="tipbox">${routeTips(s).map(t => `<div><b>${t[0]}</b>${t[1]}</div>`).join('')}</div>`;
   }
 
   // ---------- 당구대 그리기 ----------
@@ -1132,7 +1373,7 @@ if (typeof module !== 'undefined') module.exports = Vision;
   function currentShot() {
     if (state.mode === 'aim') return aimShot;
     const s = state.sols[state.sel];
-    if (!s || state.solving) return null;
+    if (!s || state.solving || (state.hideAns && !state.revealed)) return null;
     return { rec: s.rec, objPts: s.risk.objPts };
   }
 
@@ -1349,7 +1590,7 @@ if (typeof module !== 'undefined') module.exports = Vision;
     const t0 = performance.now();
     const frame = now => {
       if (!anim) return;
-      const t = Math.min(end, (now - t0) / 1000);
+      const t = Math.min(end, (now - t0) / 1000 * (+state.playSpeed || 1));
       const pc = Engine.posAt(cueTl, t, C.a);
       if (pc) anim.pos[state.myBall] = M(pc);
       if (objKeyHit && rk.objTl && t > rk.tContact) {
@@ -1739,6 +1980,9 @@ if (typeof module !== 'undefined') module.exports = Vision;
   bindSeg('#segMy', 'myBall', () => { aimShot = null; if (state.mode === 'aim') updateAim(); drawTable(); requestSolve(); });
   bindSeg('#segSpeed', 'speed', () => { if (state.mode === 'aim') updateAim(); requestSolve(); });
   bindSeg('#segBg', 'showPhoto', () => drawTable());
+  bindSeg('#segPlay', 'playSpeed');
+  $('#hideIn').checked = !!state.hideAns;
+  $('#hideIn').addEventListener('change', e => { state.hideAns = e.target.checked; state.revealed = false; saveSettings(); stopAnim(); renderRec(); drawTable(); });
   const spinIn = $('#spinIn');
   spinIn.value = state.spinGain; $('#spinOut').textContent = '×' + (+state.spinGain).toFixed(2).replace(/0$/, '');
   spinIn.addEventListener('input', () => { state.spinGain = +spinIn.value; $('#spinOut').textContent = '×' + state.spinGain.toFixed(2).replace(/0$/, ''); if (state.mode === 'aim') { updateAim(); drawTable(); } });
@@ -1749,6 +1993,211 @@ if (typeof module !== 'undefined') module.exports = Vision;
     try { localStorage.removeItem('cue3-layout'); } catch (e) { /* 무시 */ }
     aimShot = null; if (state.mode === 'aim') updateAim(); drawTable(); requestSolve();
   });
+
+  // ---------- 배치: 무작위 · 문제집 · 코드 ----------
+  function setBalls(balls, source) {
+    pushUndo(snapBalls());
+    state.balls = balls; state.source = source; state.detect = null;
+    for (const k of ['white', 'yellow', 'red']) state.balls[k] = clampBall(state.balls[k]);
+    for (const k of ['white', 'yellow', 'red']) separate(k);
+    saveLayout(); aimShot = null;
+    if (state.mode === 'aim') updateAim();
+    drawTable(); requestSolve(); renderCode();
+  }
+  function randomBalls() {
+    const t = T(), m = Engine.R * 2.5, out = {};
+    for (const k of ['white', 'yellow', 'red']) {
+      for (let n = 0; n < 200; n++) {
+        const p = { x: m + Math.random() * (t.W - 2 * m), y: m + Math.random() * (t.H - 2 * m) };
+        if (Object.values(out).every(o => Math.hypot(o.x - p.x, o.y - p.y) > 0.2)) { out[k] = p; break; }
+      }
+    }
+    return out;
+  }
+  $('#btnRandom').addEventListener('click', () => {
+    setBalls(randomBalls(), 'saved');
+    $('#cvTable').scrollIntoView({ block: 'nearest' });
+  });
+  const mm = v => String(Math.max(0, Math.min(9999, Math.round(v * 1000)))).padStart(4, '0');
+  function layoutCode() {
+    const b = state.balls;
+    return `3C-${state.table === 'jungdae' ? 'J' : 'D'}-${state.myBall === 'yellow' ? 'Y' : 'W'}-` +
+      ['white', 'yellow', 'red'].map(k => mm(b[k].x) + '-' + mm(b[k].y)).join('-');
+  }
+  function renderCode() { $('#codeOut').value = layoutCode(); }
+  $('#btnCopyCode').addEventListener('click', () => {
+    const el = $('#codeOut'); renderCode();
+    const fallback = () => { el.focus(); el.select(); toast('코드를 선택해 두었어요. 길게 눌러 복사하세요.', 'info'); };
+    try {
+      navigator.clipboard.writeText(el.value).then(() => toast('배치 코드를 복사했어요.', 'info'), fallback);
+    } catch (e) { fallback(); }
+  });
+  function pickSeg(id, v) { const b = document.querySelector(`${id} button[data-v="${v}"]`); if (b && b.getAttribute('aria-pressed') !== 'true') b.click(); }
+  $('#btnLoadCode').addEventListener('click', () => {
+    const m = ($('#codeIn').value || '').trim().match(/3C-([DJ])-([WY])-(\d{4})-(\d{4})-(\d{4})-(\d{4})-(\d{4})-(\d{4})/i);
+    if (!m) { toast('코드 모양이 달라요. 3C-D-W-로 시작하는 코드를 통째로 붙여 넣어 주세요.', 'warn'); return; }
+    pickSeg('#segTable', m[1].toUpperCase() === 'J' ? 'jungdae' : 'daedae');
+    pickSeg('#segMy', m[2].toUpperCase() === 'Y' ? 'yellow' : 'white');
+    const v = i => +m[i] / 1000;
+    setBalls({ white: { x: v(3), y: v(4) }, yellow: { x: v(5), y: v(6) }, red: { x: v(7), y: v(8) } }, 'saved');
+    $('#codeIn').value = '';
+    toast('배치를 불러왔어요.', 'info');
+  });
+  // 문제집
+  const loadSaved = () => { try { const a = JSON.parse(localStorage.getItem('cue3-saved') || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+  const storeSaved = a => { try { localStorage.setItem('cue3-saved', JSON.stringify(a)); return true; } catch (e) { return false; } };
+  const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function renderSaved() {
+    const a = loadSaved(), el = $('#savedList');
+    if (!a.length) { el.innerHTML = '<p class="sub" style="margin:0">저장한 배치가 없어요. 놓친 공이나 연습할 배치를 저장해 두세요.</p>'; return; }
+    el.innerHTML = `<div class="scroll-x"><table class="list"><tr><th>이름</th><th>테이블</th><th></th></tr>${a.map((it, i) => `<tr><td style="white-space:normal">${esc(it.name)}</td><td class="sub">${it.code.charAt(3) === 'J' ? '중대' : '대대'}</td><td class="r"><button type="button" class="mini" data-load="${i}">불러오기</button> <button type="button" class="mini del" data-del="${i}" aria-label="${esc(it.name)} 지우기">지우기</button></td></tr>`).join('')}</table></div>`;
+  }
+  $('#btnSaveLayout').addEventListener('click', () => {
+    const a = loadSaved();
+    const name = ($('#saveName').value || '').trim() || `배치 ${a.length + 1}`;
+    a.unshift({ name, code: layoutCode() });
+    if (!storeSaved(a.slice(0, 40))) { toast('이 브라우저에서는 저장할 수 없어요. 배치 코드를 복사해 두세요.', 'warn'); return; }
+    $('#saveName').value = ''; renderSaved(); toast(`'${name}' 저장했어요.`, 'info');
+  });
+  $('#savedList').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const a = loadSaved();
+    if (b.dataset.load != null) { const it = a[+b.dataset.load]; if (it) { $('#codeIn').value = it.code; $('#btnLoadCode').click(); } }
+    if (b.dataset.del != null) { a.splice(+b.dataset.del, 1); storeSaved(a); renderSaved(); }
+  });
+  renderSaved();
+
+  // ---------- 탭 ----------
+  function showTab(tab) {
+    for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+    $('#tabFind').hidden = tab !== 'find';
+    $('#tabScore').hidden = tab !== 'score';
+    $('#tabTips').hidden = tab !== 'tips';
+    document.querySelector('.upload-actions').hidden = tab !== 'find';
+    if (tab !== 'find') stopAnim();
+    else showView(state.view);
+    if (tab === 'score') Score.render();
+  }
+  document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+
+  // ---------- 파이브앤하프 ----------
+  function fiveHalf() {
+    const c = parseFloat($('#fhCue').value), a = parseFloat($('#fhArr').value);
+    if (!isFinite(c) || !isFinite(a)) { $('#fhOut').textContent = '–'; $('#fhNote').textContent = '두 숫자를 넣어 주세요.'; return; }
+    const r = Math.round((c - a) * 10) / 10;
+    $('#fhOut').textContent = r;
+    $('#fhNote').textContent = r < 0 ? '1쿠션 수가 0보다 작아요. 이 출발점에서는 그 도착점이 시스템 범위를 벗어납니다.'
+      : `수구 ${c}에서 1쿠션 ${r}을 겨냥하면 3쿠션 ${a} 근처에 도착합니다.`;
+  }
+  $('#fhCue').addEventListener('input', fiveHalf); $('#fhArr').addEventListener('input', fiveHalf); fiveHalf();
+
+  // ---------- 점수판 ----------
+  const Score = (() => {
+    const KEY = 'cue3-score', HKEY = 'cue3-history';
+    const fresh = () => ({ scores: [0, 0], inn: [1, 0], high: [0, 0], run: 0, turn: 0, first: 0, last: false, done: false, started: Date.now() });
+    let g = fresh(), undo = [];
+    try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); if (v && v.g && Array.isArray(v.g.scores)) { g = v.g; for (const i of [0, 1]) { if (v.names) $('#scName' + i).value = v.names[i]; if (v.targets) $('#scT' + i).value = v.targets[i]; } } } catch (e) { /* 없음 */ }
+    const names = () => [0, 1].map(i => ($('#scName' + i).value || '').trim() || (i ? '선수 B' : '선수 A'));
+    const targets = () => [0, 1].map(i => Math.max(1, Math.min(200, parseInt($('#scT' + i).value, 10) || 20)));
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ g, names: names(), targets: targets() })); } catch (e) { /* 무시 */ } };
+    const hist = () => { try { const a = JSON.parse(localStorage.getItem(HKEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+    const avg = (sc, inn) => inn > 0 ? (sc / inn).toFixed(3) : '0.000';
+    const snap = () => { undo.push(JSON.stringify(g)); if (undo.length > 200) undo.shift(); };
+    const msg = t => { const m = $('#scMsg'); m.hidden = !t; m.textContent = t || ''; };
+
+    function finish() {
+      g.done = true;
+      const n = names(), t = targets();
+      const won = [0, 1].map(i => g.scores[i] >= t[i]);
+      const res = won[0] && won[1] ? '무승부' : won[0] ? `${n[0]} 승` : `${n[1]} 승`;
+      msg(`경기 끝 · ${res}. 새 경기를 누르면 다음 경기를 시작해요.`);
+      const a = hist();
+      a.unshift({ d: Date.now(), n, t, s: g.scores.slice(), i: g.inn.slice(), h: g.high.slice(), res });
+      try { localStorage.setItem(HKEY, JSON.stringify(a.slice(0, 100))); } catch (e) { /* 무시 */ }
+    }
+    function hit() {
+      if (g.done) return;
+      snap();
+      const p = g.turn, t = targets();
+      g.scores[p]++; g.run++; g.high[p] = Math.max(g.high[p], g.run);
+      if (g.scores[p] >= t[p]) {
+        if (g.last || p !== g.first) finish();
+        else {
+          // 선구가 먼저 끝내면 후구에게 같은 이닝 기회
+          g.last = true; g.turn = 1 - p; g.run = 0; g.inn[g.turn]++;
+          msg(`${names()[p]} 목표 도달! ${names()[g.turn]}에게 마지막 이닝 기회가 있어요.`);
+        }
+      }
+      render();
+    }
+    function miss() {
+      if (g.done) return;
+      snap();
+      if (g.last) { finish(); render(); return; }
+      g.turn = 1 - g.turn; g.run = 0; g.inn[g.turn]++;
+      render();
+    }
+    function render() {
+      const n = names(), t = targets();
+      for (const i of [0, 1]) {
+        $('#scS' + i).textContent = g.scores[i];
+        $('#scI' + i).textContent = g.inn[i];
+        $('#scA' + i).textContent = avg(g.scores[i], g.inn[i]);
+        $('#scH' + i).textContent = g.high[i];
+        $('#scR' + i).textContent = g.turn === i && !g.done ? g.run : 0;
+        $('#scB' + i).style.width = Math.min(100, g.scores[i] / t[i] * 100) + '%';
+        $('#scP' + i).classList.toggle('on', g.turn === i && !g.done);
+      }
+      $('#scInfo').textContent = g.done ? '경기 끝' : `${Math.max(g.inn[0], g.inn[1])}이닝 · ${n[g.turn]} 차례${g.turn === g.first ? ' (선구)' : ''}`;
+      $('#scHit').disabled = $('#scMiss').disabled = g.done;
+      $('#scUndo').disabled = !undo.length;
+      $('#scSwap').disabled = g.scores[0] + g.scores[1] > 0 || g.inn[1] > 0;
+      renderHist(); save();
+    }
+    function renderHist() {
+      const a = hist();
+      const fmt = d => { const x = new Date(d); return `${x.getMonth() + 1}/${x.getDate()}`; };
+      $('#scHist').innerHTML = a.length ? `<table class="list"><tr><th>날짜</th><th>경기</th><th class="r">점수</th><th class="r">이닝</th><th>결과</th></tr>${a.slice(0, 20).map(r =>
+        `<tr><td>${fmt(r.d)}</td><td>${esc(r.n[0])} vs ${esc(r.n[1])}</td><td class="r num">${r.s[0]}/${r.t[0]} : ${r.s[1]}/${r.t[1]}</td><td class="r num">${Math.max(r.i[0], r.i[1])}</td><td>${esc(r.res)}</td></tr>`).join('')}</table>`
+        : '<p class="sub" style="margin:0">끝난 경기가 여기에 쌓여요.</p>';
+      // 이름별 누적 에버리지
+      const by = new Map();
+      for (const r of a) for (const i of [0, 1]) {
+        const k = r.n[i]; const o = by.get(k) || { g: 0, s: 0, i: 0, h: 0, w: 0, recent: [] };
+        o.g++; o.s += r.s[i]; o.i += r.i[i]; o.h = Math.max(o.h, r.h[i]); if (r.s[i] >= r.t[i] && r.s[1 - i] < r.t[1 - i]) o.w++;
+        if (o.recent.length < 10) { o.recent.push([r.s[i], r.i[i]]); }
+        by.set(k, o);
+      }
+      const rows = [...by.entries()].sort((x, y) => y[1].g - x[1].g);
+      $('#scMine').innerHTML = rows.length ? `<table class="list"><tr><th>이름</th><th class="r">경기</th><th class="r">승</th><th class="r">전체 에버</th><th class="r">최근 10경기</th><th class="r">하이런</th></tr>${rows.map(([k, o]) => {
+        const rs = o.recent.reduce((q, v) => [q[0] + v[0], q[1] + v[1]], [0, 0]);
+        return `<tr><td>${esc(k)}</td><td class="r num">${o.g}</td><td class="r num">${o.w}</td><td class="r num">${avg(o.s, o.i)}</td><td class="r num">${avg(rs[0], rs[1])}</td><td class="r num">${o.h}</td></tr>`;
+      }).join('')}</table>` : '<p class="sub" style="margin:0">경기를 끝내면 이름별 에버리지와 하이런이 정리돼요.</p>';
+    }
+    $('#scHit').addEventListener('click', hit);
+    $('#scMiss').addEventListener('click', miss);
+    $('#scUndo').addEventListener('click', () => {
+      const v = undo.pop(); if (!v) return;
+      const wasDone = g.done; g = JSON.parse(v);
+      if (wasDone && !g.done) {
+        // 끝난 경기를 되돌리면 기록에서도 뺌
+        const a = hist(); a.shift(); try { localStorage.setItem(HKEY, JSON.stringify(a)); } catch (e) { /* 무시 */ }
+      }
+      msg(g.last ? '후구 마지막 이닝 중이에요.' : ''); render();
+    });
+    $('#scSwap').addEventListener('click', () => { snap(); g.first = 1 - g.first; g.turn = g.first; g.inn = g.first ? [0, 1] : [1, 0]; render(); });
+    $('#scNew').addEventListener('click', () => { const f = g.first; g = fresh(); g.first = f; g.turn = f; g.inn = f ? [0, 1] : [1, 0]; undo = []; msg(''); render(); });
+    $('#scClear').addEventListener('click', e => {
+      const b = e.currentTarget;
+      if (b.dataset.armed) { try { localStorage.removeItem(HKEY); } catch (err) { /* 무시 */ } delete b.dataset.armed; b.textContent = '기록 지우기'; renderHist(); return; }
+      b.dataset.armed = '1'; b.textContent = '한 번 더 누르면 지워요';
+      setTimeout(() => { delete b.dataset.armed; b.textContent = '기록 지우기'; }, 3000);
+    });
+    for (const id of ['#scName0', '#scName1', '#scT0', '#scT1']) $(id).addEventListener('input', render);
+    if (g.done) msg('지난 경기가 끝난 상태예요. 새 경기를 눌러 시작하세요.');
+    else if (g.last) msg('후구 마지막 이닝 중이에요.');
+    return { render };
+  })();
 
   // ---------- 시작 ----------
   let lastW = 0;
@@ -1762,7 +2211,9 @@ if (typeof module !== 'undefined') module.exports = Vision;
   if (mq.addEventListener) mq.addEventListener('change', () => drawTable());
   new MutationObserver(() => drawTable()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => drawTable());
-  layoutTable(); renderStatus(); drawTable(); requestSolve();
+  layoutTable(); renderStatus(); drawTable(); requestSolve(); renderCode();
+  const h0 = (location.hash || '').slice(1);
+  if (h0 === 'score' || h0 === 'tips') showTab(h0);
 })();
 </script>
 
