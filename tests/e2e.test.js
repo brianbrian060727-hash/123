@@ -176,3 +176,49 @@ test('E2E 16: 상대 전적과 탭을 떠나면 샷 클락 멈춤', async () => 
   assert.equal(await p.textContent('#scClockNum'), a);
   noErr(p); await p.context().close();
 });
+test('E2E 17: 화면 밝기 버튼이 시스템 → 밝게 → 어둡게로 바뀜', async () => {
+  const p = await open();
+  await p.click('#btnTheme'); assert.equal(await p.getAttribute('html', 'data-theme'), 'light');
+  await p.click('#btnTheme'); assert.equal(await p.getAttribute('html', 'data-theme'), 'dark');
+  await p.click('#btnTheme'); assert.equal(await p.getAttribute('html', 'data-theme'), null);
+  noErr(p); await p.context().close();
+});
+test('E2E 18: 키보드(리모컨)로 점수 입력', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  await p.click('#scStart');
+  await p.keyboard.press('ArrowUp'); await p.keyboard.press('ArrowUp'); await p.keyboard.press('ArrowDown');
+  await p.keyboard.press('PageUp'); await p.keyboard.press('ArrowLeft');
+  const b = await p.$$eval('.sc-score b', e => e.map(x => x.textContent));
+  assert.deepEqual(b, ['2', '0']);
+  noErr(p); await p.context().close();
+});
+test('E2E 19: 경기 중 새 경기는 두 번 눌러야 함', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  await p.click('#scStart'); await p.click('#scHit');
+  await p.click('#scNew'); assert.equal(await p.isVisible('#scGame'), true);
+  await p.click('#scNew'); assert.equal(await p.isVisible('#scSetup'), true);
+  noErr(p); await p.context().close();
+});
+test('E2E 20: 꿀팁 찾기', async () => {
+  const p = await open({ hash: '#tips', noWait: true });
+  await p.fill('#tipQ', '키스');
+  const vis = await p.$$eval('#tipList details.tip', d => d.filter(x => !x.hidden).length);
+  assert.ok(vis >= 1 && vis < 7);
+  await p.fill('#tipQ', 'zzzz없는말'); assert.equal(await p.isVisible('#tipNone'), true);
+  noErr(p); await p.context().close();
+});
+test('E2E 21: 휴대폰은 아래 탭바, 넓은 화면은 2단', async () => {
+  const p = await open();
+  const nav = await p.$eval('.tabs', n => { const r = n.getBoundingClientRect(); return { pos: getComputedStyle(n).position, bottom: r.bottom, h: innerHeight }; });
+  assert.equal(nav.pos, 'fixed'); assert.ok(Math.abs(nav.bottom - nav.h) < 1);
+  await p.setViewportSize({ width: 1280, height: 900 }); await p.waitForTimeout(150);
+  const cols = await p.evaluate(() => { const a = document.querySelector('.table-col').getBoundingClientRect(), b = document.querySelector('.side-col').getBoundingClientRect(); return [a.left, b.left, a.top, b.top]; });
+  assert.ok(cols[1] > cols[0] + 300 && Math.abs(cols[2] - cols[3]) < 2, JSON.stringify(cols));
+  noErr(p); await p.context().close();
+});
+test('E2E 22: 추천 길 칩에 길 그림, 조준해 보기로 직접 조준', async () => {
+  const p = await open();
+  assert.ok(await p.$$eval('.chip svg.thumb polyline', e => e.length) >= 1);
+  await p.click('#btnTryAim'); assert.equal(await p.isVisible('#aimPanel'), true);
+  noErr(p); await p.context().close();
+});
