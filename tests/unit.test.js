@@ -306,6 +306,7 @@ test('4구: 목표를 넘는 득점은 기록·하이런에 넣지 않음', () =
   assert.notEqual(p.high, 160); assert.equal(p.log.reduce((a, b) => a + b, 0), p.score); assert.equal(g.turn, 1);
 });
 test('4구: 목표 범위 5000까지', () => { const g = SC.create([{ name: 'a', target: 3000 }], { step: 10 }); assert.equal(g.players[0].target, 3000); });
+test('4구: 혼자 연습 결과 문구의 에버는 소수 한 자리', () => { const g = play(SC.create([{ name: 'a', target: 20 }], { step: 10 }), 'hmh'); assert.match(SC.result(g), /목표 20점 달성 · 2이닝 · 에버 10\.0$/); });
 
 test('시스템 표: 순회전은 겨냥 방향에 따라 당점 좌우가 바뀜', () => {
   const rows = Engine.sysTable({ table: 'daedae', cue: { x: 1.4, y: 1.0 }, objs: [{ x: 1, y: 1 }, { x: 2, y: 0.5 }] }, { rail: 2, E: 2, auto: true });

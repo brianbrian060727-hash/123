@@ -1198,5 +1198,8 @@ test('E2E 68: 혼자 연습은 목표를 못 채우면 배지 없음, 채우면 
   await p.fill('#scPlayers input[data-k="target"]', '1');
   await p.click('#scStart'); await p.click('#scHit');
   assert.equal(await p.textContent('#scBoard .badge'), '달성');
+  // 혼자 연습 큰 화면도 숫자를 크게
+  await p.click('#scBig');
+  assert.ok(await p.$eval('#scBoard .sc-score b', e => parseFloat(getComputedStyle(e).fontSize)) > 120);
   noErr(p); await p.context().close();
 });

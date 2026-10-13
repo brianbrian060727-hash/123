@@ -308,8 +308,9 @@ body.focus #scGame:not(.done) #scCopy, body.focus #scNew { display: none; }
   body.focus #scGame { min-height: calc(100vh - 24px); min-height: calc(100dvh - 24px); display: flex; flex-direction: column; }
   body.focus #scBoard { flex: 1; grid-template-columns: 1fr; }
   body.focus .sc-p { justify-content: center; }
-  /* 낮은 화면에서는 두 카드와 버튼이 한 화면에 들어오도록 줄임 */
-  body.focus[data-np='1'] #scGame .sc-score b, body.focus[data-np='2'] #scGame .sc-score b { font-size: max(56px, min(24vh, 40vw, 50vh - 270px)); }
+  body.focus[data-np='1'] #scGame .sc-score b { font-size: min(24vh, 40vw); }
+  /* 2명: 낮은 화면에서는 두 카드와 버튼이 한 화면에 들어오도록 줄임 */
+  body.focus[data-np='2'] #scGame .sc-score b { font-size: max(56px, min(24vh, 40vw, 50vh - 270px)); }
   body.focus .sc-actions { margin-top: auto; }
   /* 3명 이상은 두 줄로 나누고 차례가 아닌 선수의 기록은 숨김 */
   body.focus:not([data-np='2']):not([data-np='1']) #scBoard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1533,7 +1534,8 @@ const Core = (() => {
     const st = standings(g);
     if (g.players.length === 1) {
       const p = g.players[0];
-      return p.score >= p.target ? `목표 ${p.target}점 달성 · ${p.inn}이닝 · 에버 ${avg(p).toFixed(3)}` : `${p.inn}이닝 동안 ${p.score}점 · 에버 ${avg(p).toFixed(3)}`;
+      const a = avg(p).toFixed(g.step > 1 ? 1 : 3); // 4구(10점 단위)는 소수 한 자리
+      return p.score >= p.target ? `목표 ${p.target}점 달성 · ${p.inn}이닝 · 에버 ${a}` : `${p.inn}이닝 동안 ${p.score}점 · 에버 ${a}`;
     }
     // 함께 목표에 닿았거나, 아무도 못 닿았는데 달성률이 같으면 무승부 (핸디 경기에서 점수만 많다고 이기지 않음)
     const top = st.filter(s => s.reached === st[0].reached && Math.abs(s.ratio - st[0].ratio) < 1e-9);
