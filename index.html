@@ -239,20 +239,29 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
 .sc-bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width 0.2s; }
 .sc-stats { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 10px; }
 .sc-stats .num { color: var(--ink); }
-.sc-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.btn.big { min-height: 58px; font-size: 16px; border-radius: 14px; }
+.sc-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+/* 좁은 화면에서 긴 버튼 글자는 줄을 바꿔 칸 안에 */
+.btn.big { min-height: 58px; font-size: 16px; border-radius: 14px; white-space: normal; line-height: 1.25; text-align: center; }
 .btn.good { background: var(--good); border-color: var(--good); color: var(--accent-ink); }
 .quick-my { display: inline-flex; align-items: center; gap: 6px; }
 .sc-board { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.sc-p .pname { font-weight: 700; font-size: 16px; display: flex; justify-content: space-between; gap: 6px; min-width: 0; }
+.sc-p .pname { font-weight: 700; font-size: 16px; display: flex; justify-content: space-between; align-items: center; gap: 6px; min-width: 0; }
 .sc-p .pname span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sc-p .tgt { font-family: var(--f-num); font-size: 13px; color: var(--muted); }
 .sc-p.win { border-color: var(--good); }
-.badge { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
+.badge { font-size: 11px; font-weight: 700; line-height: 1.5; align-self: center; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
 .badge.good { background: var(--good); color: #fff; }
 .pl-list { display: grid; gap: 8px; }
 .pl-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) 84px; gap: 8px; align-items: center; }
 .pl-row .idx { font-family: var(--f-num); color: var(--muted); font-size: 13px; text-align: center; }
+.pl-head { display: grid; grid-template-columns: 22px minmax(0, 1fr) 84px; gap: 8px; margin-bottom: -4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.pl-head span:first-child { grid-column: 2; }
+.pl-head span:last-child { white-space: nowrap; text-align: center; }
+#scMore .set-body { padding-top: 2px; }
+#scMore summary .sub { display: block; font-weight: 400; }
+.set-row input[type="checkbox"] { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
+/* 체크박스·숫자 칸 줄: 설명이 길어도 컨트롤은 항상 오른쪽 */
+.set-row.chk > label { flex: 1 1 0; min-width: 0; }
 .num-in { width: 84px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-family: var(--f-num); font-size: 16px; }
 .stepper { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
 .stepper .mini { width: 40px; min-height: 40px; font-size: 18px; }
@@ -279,6 +288,7 @@ body.focus .bar, body.focus .tabs, body.focus #scSide, body.focus #scLogWrap, bo
 body.focus #scGame .sc-score b { font-size: clamp(72px, 18vw, 160px); }
 body.focus #scGame .pname { font-size: clamp(18px, 3.5vw, 30px); }
 body.focus .btn.big { min-height: 84px; font-size: 20px; }
+body.focus #scGame:not(.done) #scCopy, body.focus #scNew { display: none; }
 /* 큰 화면 + 가로로 눕힌 휴대폰·태블릿: 점수는 왼쪽, 버튼은 오른쪽 */
 @media (orientation: landscape) and (max-height: 640px) {
   body.focus #scGame { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 30%); grid-template-areas: "head head" "board act" "board clock" "board tools" "board msg"; gap: 10px; align-content: start; }
@@ -290,6 +300,21 @@ body.focus .btn.big { min-height: 84px; font-size: 20px; }
   body.focus #scMsg { grid-area: msg; }
   body.focus #scGame .sc-score b { font-size: clamp(56px, 16vh, 120px); }
   body.focus .wrap { padding-bottom: 16px; }
+}
+/* 큰 화면 + 세로 휴대폰: 선수 카드가 화면을 채우고 득점·공타는 아래 */
+@media (orientation: portrait) {
+  body.focus { margin: 0; }
+  body.focus .wrap { padding-bottom: 12px; }
+  body.focus #scGame { min-height: calc(100vh - 24px); min-height: calc(100dvh - 24px); display: flex; flex-direction: column; }
+  body.focus #scBoard { flex: 1; grid-template-columns: 1fr; }
+  body.focus .sc-p { justify-content: center; }
+  /* 낮은 화면에서는 두 카드와 버튼이 한 화면에 들어오도록 줄임 */
+  body.focus[data-np='1'] #scGame .sc-score b, body.focus[data-np='2'] #scGame .sc-score b { font-size: max(56px, min(24vh, 40vw, 50vh - 270px)); }
+  body.focus .sc-actions { margin-top: auto; }
+  /* 3명 이상은 두 줄로 나누고 차례가 아닌 선수의 기록은 숨김 */
+  body.focus:not([data-np='2']):not([data-np='1']) #scBoard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body.focus:not([data-np='2']):not([data-np='1']) #scGame .sc-score b { font-size: clamp(40px, 12vw, 72px); }
+  body.focus:not([data-np='2']):not([data-np='1']) .sc-p:not(.on) .sc-stats { display: none; }
 }
 
 /* 꿀팁 */
@@ -616,23 +641,28 @@ details.settings { box-shadow: var(--shadow); }
         <div class="seg" id="scType"><button type="button" data-v="3c">3쿠션</button><button type="button" data-v="4b">4구 (1득점 10점)</button></div></div>
       <div class="set-row"><label>인원</label>
         <div class="stepper"><button type="button" class="mini" id="scMinus" aria-label="인원 줄이기">−</button><b id="scCount">2</b><button type="button" class="mini" id="scPlus" aria-label="인원 늘리기">+</button></div></div>
+      <div class="pl-head" aria-hidden="true"><span>이름</span><span>목표 점수(핸디)</span></div>
       <div class="pl-list" id="scPlayers"></div>
       <datalist id="rosterNames"></datalist>
       <div class="row-inline"><button type="button" class="btn sm" id="scRosterSave">이 선수들 명단에 저장</button><span class="sub">명단에 있는 이름을 고르면 그 사람 점수(핸디)가 자동으로 들어가요</span></div>
+      <button type="button" class="btn primary big" id="scStart">경기 시작</button>
       <details class="tip" id="scRosterBox"><summary>선수 명단 <span class="sub" id="scRosterCount"></span></summary><div class="scroll-x" id="scRoster"></div></details>
-      <div class="set-row"><label for="scLimit">이닝 제한<span class="sub">0이면 제한 없음. 혼자 연습이면 '20이닝 에버 측정'처럼 써요</span></label>
+      <details class="settings" id="scMore"><summary><span>추가 설정<span class="sub">이닝 제한 · 샷 클락 · 팀전 · 중계 · 음성 · 리모컨</span></span></summary>
+      <div class="set-body">
+      <div class="set-row chk"><label for="scLimit">이닝 제한<span class="sub">0이면 제한 없음. 혼자 연습이면 '20이닝 에버 측정'처럼 써요</span></label>
         <input class="num-in" id="scLimit" type="number" inputmode="numeric" min="0" max="99" value="0"></div>
       <div class="set-row"><label>샷 클락<span class="sub">한 샷에 쓸 수 있는 시간. 10초 남으면 소리로 알려요</span></label>
         <div class="seg" id="scClockSeg"><button type="button" data-v="0">끔</button><button type="button" data-v="30">30초</button><button type="button" data-v="40">40초</button><button type="button" data-v="50">50초</button><button type="button" data-v="60">60초</button></div></div>
-      <div class="set-row"><label for="scTeam">팀전<span class="sub">이름 칸에 '철수, 영희'처럼 쉼표로 팀원을 적으면 이닝마다 번갈아 쳐요</span></label><input type="checkbox" id="scTeam"></div>
-      <div class="set-row" id="scLiveRow" hidden><label for="scLive">실시간 중계<span class="sub">같은 링크를 연 클럽 사람들이 점수를 실시간으로 봐요</span></label><input type="checkbox" id="scLive"></div>
-      <div class="set-row"><label for="scVoice">음성 안내<span class="sub" id="scVoiceSub">득점과 차례를 읽어 줘요</span></label><input type="checkbox" id="scVoice"></div>
+      <div class="set-row chk"><label for="scTeam">팀전<span class="sub">이름 칸에 '철수, 영희'처럼 쉼표로 팀원을 적으면 이닝마다 번갈아 쳐요</span></label><input type="checkbox" id="scTeam"></div>
+      <div class="set-row chk" id="scLiveRow" hidden><label for="scLive">실시간 중계<span class="sub">같은 링크를 연 클럽 사람들이 점수를 실시간으로 봐요</span></label><input type="checkbox" id="scLive"></div>
+      <div class="set-row chk"><label for="scVoice">음성 안내<span class="sub" id="scVoiceSub">득점과 차례를 읽어 줘요</span></label><input type="checkbox" id="scVoice"></div>
       <div class="set-row"><label>리모컨 · 키보드<span class="sub" id="scKeyInfo"></span></label><button type="button" class="btn sm" id="scKeyLearn">리모컨 버튼 지정</button></div>
       <div class="tipbox" id="scKeyPanel" hidden>
         <div id="scKeyStep"></div>
         <div class="row-inline"><button type="button" class="btn sm" id="scKeySkip">이 동작 건너뛰기</button><button type="button" class="btn sm" id="scKeyReset">기본값으로</button><button type="button" class="btn sm" id="scKeyDone">끝내기</button></div>
       </div>
-      <button type="button" class="btn primary big" id="scStart">경기 시작</button>
+      </div>
+      </details>
     </div>
 
     <div class="panel" id="scGame" hidden>
@@ -650,12 +680,14 @@ details.settings { box-shadow: var(--shadow); }
         <button type="button" class="btn sm" id="scUndo">되돌리기</button>
         <button type="button" class="btn sm" id="scBig">큰 화면</button>
         <button type="button" class="btn sm" id="scCopy">결과 복사</button>
+        <button type="button" class="btn sm primary" id="scAgain" hidden>같은 설정으로 한 판 더</button>
+        <button type="button" class="btn sm" id="scSwap" hidden>순서 바꿔서</button>
         <button type="button" class="btn sm" id="scNew">새 경기</button>
       </div>
       <p class="toast info" id="scMsg" hidden></p>
       <p class="sub" id="scAwake" style="margin:0"></p>
       <div id="scLogWrap"><span class="lbl">이닝별 득점</span><div class="scroll-x" id="scLog"></div></div>
-      <p class="note" id="scNote">득점하면 +1, 못 맞히면 공타. 누가 목표에 닿으면 그 이닝을 끝까지 돌려 뒷순서 선수에게 같은 이닝 기회를 줍니다. 경기 중에는 화면이 꺼지지 않게 해 둬요.<br>키보드·블루투스 리모컨: <span class="kbd">Space</span> 또는 <span class="kbd">↑</span> 득점 · <span class="kbd">Enter</span> 또는 <span class="kbd">↓</span> 공타 · <span class="kbd">←</span> 되돌리기. 다른 버튼을 쓰려면 경기 설정의 '리모컨 버튼 지정'.</p>
+      <p class="note" id="scNote"><span id="scNoteStep">득점하면 +1, 못 맞히면 공타.</span> 누가 목표에 닿으면 그 이닝을 끝까지 돌려 뒷순서 선수에게 같은 이닝 기회를 줍니다. 경기 중에는 화면이 꺼지지 않게 해 둬요.<br>키보드·블루투스 리모컨: <span class="kbd">Space</span> 또는 <span class="kbd">↑</span> 득점 · <span class="kbd">Enter</span> 또는 <span class="kbd">↓</span> 공타 · <span class="kbd">←</span> 되돌리기. 다른 버튼을 쓰려면 경기 설정 › 추가 설정의 '리모컨 버튼 지정'.</p>
     </div>
 
     <div id="scSide" class="col">
@@ -3110,7 +3142,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     catch (e) { $('#scSetup .panel-head').insertAdjacentHTML('afterend', "<p class='hint' id='scNoStore'>이 화면에서는 기록이 저장되지 않아요. 경기가 끝나면 '결과 복사'를 눌러 두세요.</p>"); }
     // 이미 망가진 저장값도 읽을 때 정리
     const hist = () => { try { const a = JSON.parse(localStorage.getItem(HKEY) || '[]'); return Array.isArray(a) ? a.map(cleanGame).filter(Boolean) : []; } catch (e) { return []; } };
-    const fmtAvg = p => SC.avg(p).toFixed(3);
+    const fmtAvg = p => SC.avg(p).toFixed(g && g.kind === '4b' ? 1 : 3); // 4구는 10점 단위라 소수 한 자리
     const who = i => g.team ? `${g.players[i].name.split(/[,·/]/)[0].trim()}팀 ${SC.shooter(g.players[i])}` : g.players[i].name;
     const msg = t => { const m = $('#scMsg'); m.hidden = !t; m.textContent = t || ''; };
 
@@ -3375,9 +3407,12 @@ if (typeof module !== 'undefined') module.exports = Core;
       try { if (on && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {}); if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) { /* 무시 */ }
     }
     $('#scBig').addEventListener('click', () => setFocus(!document.body.classList.contains('focus')));
+    // 재경기: 경기 시작 버튼과 같은 길로(순서 바꾸기는 설정의 선수 순서를 뒤집음)
+    $('#scAgain').addEventListener('click', () => { if (g && g.done) $('#scStart').click(); });
+    $('#scSwap').addEventListener('click', () => { if (!g || !g.done) return; cfg.players.reverse(); save(); $('#scStart').click(); });
     function resultText() {
       const d = new Date();
-      const lines = [`3쿠션 ${g.players.length === 1 ? '연습' : '경기'} ${d.getMonth() + 1}/${d.getDate()}`];
+      const lines = [`${g.kind === '4b' ? '4구' : '3쿠션'} ${g.players.length === 1 ? '연습' : '경기'} ${d.getMonth() + 1}/${d.getDate()}`];
       for (const s of SC.standings(g)) lines.push(`${s.p.name}  ${s.p.score}/${s.p.target}점  ${s.p.inn}이닝  에버 ${fmtAvg(s.p)}  하이런 ${s.p.high}`);
       if (g.done) lines.push(SC.result(g));
       return lines.join('\n');
@@ -3396,17 +3431,19 @@ if (typeof module !== 'undefined') module.exports = Core;
       $('#scSetup').hidden = !!g; $('#scGame').hidden = !g;
       // 저장 먼저: 아래 화면 그리기가 실패해도 점수는 남음
       save();
-      if (!g) { renderSetup(); return; }
+      if (!g) { delete document.body.dataset.np; renderSetup(); return; }
       if (hooks.onLive && cfg.live) hooks.onLive(g);
       const solo = g.players.length === 1;
+      document.body.dataset.np = g.players.length; // 큰 화면 배치는 인원에 따라 다름
       $('#scTitle').textContent = (g.kind === '4b' ? '4구 · ' : '') + (solo ? '혼자 연습' : g.team ? `${g.players.length}팀 팀전` : `${g.players.length}인 경기`);
       const cur = g.players[g.turn];
       $('#scInfo').textContent = g.done ? '경기 끝' : `${g.round}이닝${g.limit ? ` / ${g.limit}` : ''} · ${who(g.turn)} 차례`;
       const st = g.done ? SC.standings(g) : null;
       $('#scBoard').innerHTML = g.players.map((p, i) => {
-        const on = i === g.turn && !g.done, won = g.done && st[0].i === i && !/무승부/.test(SC.result(g));
+        // 혼자 연습은 목표를 채웠을 때만 '달성'
+        const on = i === g.turn && !g.done, won = g.done && (solo ? p.score >= p.target : st[0].i === i && !/무승부/.test(SC.result(g)));
         return `<div class="sc-p${on ? ' on' : ''}${won ? ' win' : ''}">
-          <div class="pname"><span>${esc(p.name)}</span>${on ? '<span class="badge">차례</span>' : won ? '<span class="badge good">승</span>' : ''}</div>
+          <div class="pname"><span>${esc(p.name)}</span>${on ? '<span class="badge">차례</span>' : won ? `<span class="badge good">${solo ? '달성' : '승'}</span>` : ''}</div>
           ${g.team && on ? `<div class="sub">칠 사람: <b>${esc(SC.shooter(p))}</b></div>` : ''}
           <div class="sc-score"><b>${p.score}</b><span class="tgt">/ ${p.target}</span></div>
           <div class="sc-bar"><i style="width:${Math.min(100, p.score / p.target * 100)}%"></i></div>
@@ -3420,7 +3457,10 @@ if (typeof module !== 'undefined') module.exports = Core;
       $('#scHit').disabled = $('#scMiss').disabled = g.done;
       $('#scMiss').textContent = solo ? '공타 · 다음 이닝' : '공타 · 차례 넘기기';
       $('#scHit').textContent = `+${g.step || 1} 득점`;
+      $('#scNoteStep').textContent = `득점하면 +${g.step || 1}, 못 맞히면 공타.`;
       $('#scUndo').disabled = !undo.length;
+      $('#scGame').classList.toggle('done', !!g.done);
+      $('#scAgain').hidden = !g.done; $('#scSwap').hidden = !g.done || solo;
       // 이닝별 득점표
       const R = Math.max(...g.players.map(p => p.log.length));
       let h = '<table class="list log"><tr><th>선수</th>';
@@ -3575,6 +3615,8 @@ if (typeof module !== 'undefined') module.exports = Core;
       if (!e.repeat) $(id).click(); // 꾹 누르면 한 번만(반복 키는 화면 스크롤만 막음)
     });
     if (g && g.done) msg(`지난 경기 결과 · ${SC.result(g)}`);
+    // 추가 설정은 접어 두되, 기본값이 아닌 설정이 있으면 펼쳐서 시작
+    if (+cfg.limit || +cfg.clock || cfg.team || cfg.live || cfg.voice || ACT.some(([a]) => keymap[a] && keymap[a].length)) $('#scMore').open = true;
     renderHist();
     return {
       localHistory: () => hist(),

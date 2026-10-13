@@ -96,7 +96,7 @@ test('E2E 8: 혼자 연습 (이닝 제한 2)', async () => {
   const p = await open({ hash: '#score', noWait: true });
   await p.click('#scMinus');
   assert.equal(await p.textContent('#scStart'), '연습 시작');
-  await p.fill('#scLimit', '2'); await p.click('#scStart');
+  await p.click('#scMore > summary'); await p.fill('#scLimit', '2'); await p.click('#scStart');
   await p.click('#scHit'); await p.click('#scMiss'); await p.click('#scHit'); await p.click('#scHit'); await p.click('#scMiss');
   assert.match(await p.textContent('#scMsg'), /2이닝 동안 3점/);
   assert.ok((await p.textContent('#scHist')).includes('3/20'));
@@ -126,7 +126,7 @@ test('E2E 10: 점수판 되돌리기로 끝난 경기 취소', async () => {
 });
 test('E2E 11: 샷 클락 표시와 연장', async () => {
   const p = await open({ hash: '#score', noWait: true });
-  await p.click('#scClockSeg [data-v="30"]'); await p.click('#scStart');
+  await p.click('#scMore > summary'); await p.click('#scClockSeg [data-v="30"]'); await p.click('#scStart');
   assert.equal(await p.isVisible('#scClock'), true);
   await p.waitForTimeout(1200);
   const n = +(await p.textContent('#scClockNum')); assert.ok(n <= 29 && n >= 27, String(n));
@@ -138,10 +138,13 @@ test('E2E 12: 큰 화면과 결과 복사', async () => {
   const p = await open({ hash: '#score', noWait: true });
   await p.click('#scStart'); await p.click('#scHit');
   await p.click('#scBig'); assert.equal(await p.isVisible('.tabs'), false);
+  // 큰 화면에서는 경기 중 결과 복사·새 경기를 숨김
+  assert.equal(await p.isVisible('#scCopy'), false); assert.equal(await p.isVisible('#scNew'), false);
+  await p.click('#scBig'); assert.equal(await p.isVisible('.tabs'), true);
   await p.click('#scCopy');
   const clip = await p.evaluate(() => navigator.clipboard.readText());
+  assert.match(clip, /^3쿠션 경기 /);
   assert.match(clip, /선수 A {2}1\/20점/);
-  await p.click('#scBig'); assert.equal(await p.isVisible('.tabs'), true);
   noErr(p); await p.context().close();
 });
 test('E2E 13: 파이브앤하프 계산기', async () => {
@@ -164,7 +167,7 @@ test('E2E 14: 360px 다크 모드에서 가로 넘침 없음 (모든 탭)', asyn
 });
 test('E2E 15: 팀전 칠 사람 표시', async () => {
   const p = await open({ hash: '#score', noWait: true });
-  await p.check('#scTeam');
+  await p.click('#scMore > summary'); await p.check('#scTeam');
   const n = await p.$$('#scPlayers input[data-k="name"]'); await n[0].fill('철수, 영희'); await n[1].fill('민수, 지은');
   await p.click('#scStart');
   assert.match(await p.textContent('#scBoard'), /칠 사람: 철수/);
@@ -175,7 +178,7 @@ test('E2E 15: 팀전 칠 사람 표시', async () => {
 });
 test('E2E 16: 상대 전적과 탭을 떠나면 샷 클락 멈춤', async () => {
   const p = await open({ hash: '#score', noWait: true });
-  await p.click('#scClockSeg [data-v="30"]');
+  await p.click('#scMore > summary'); await p.click('#scClockSeg [data-v="30"]');
   // 기본 이름(선수 A…)은 내 기록에서 빠지므로 실제 이름으로
   const n = await p.$$('#scPlayers input[data-k="name"]'); await n[0].fill('김철수'); await n[1].fill('이영희');
   const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('1'); await t[1].fill('5');
@@ -320,7 +323,7 @@ test('E2E 25: 선수 명단 — 저장한 이름을 고르면 점수(핸디)가 
 });
 test('E2E 26: 리모컨 버튼 지정 — 아무 키나 득점/공타/되돌리기로', async () => {
   const p = await open({ hash: '#score', noWait: true });
-  await p.click('#scKeyLearn');
+  await p.click('#scMore > summary'); await p.click('#scKeyLearn');
   await p.keyboard.press('k'); await p.keyboard.press('j'); await p.keyboard.press('u');
   assert.equal(await p.isVisible('#scKeyPanel'), false);
   assert.match(await p.textContent('#scKeyInfo'), /득점 k/);
@@ -349,7 +352,7 @@ test('E2E 27: 기록 백업 저장 → 다른 기기에서 불러오기', async 
 test('E2E 28: 클럽 기록 — 경기 끝나면 공유 기록에 올라가고 실시간 중계가 보임', async () => {
   const p = await openMock({ hash: '#score', noWait: true });
   await p.waitForSelector('#clubPanel:not([hidden])');
-  assert.equal(await p.isVisible('#scLiveRow'), true);
+  await p.click('#scMore > summary'); assert.equal(await p.isVisible('#scLiveRow'), true);
   await p.check('#scLive');
   // 기본 이름(선수 A…)은 선수별 기록에서 빠지므로 실제 이름으로
   const n = await p.$$('#scPlayers input[data-k="name"]'); await n[0].fill('김철수'); await n[1].fill('이영희');
@@ -530,7 +533,7 @@ test('E2E 38: 손가락으로 득점을 누른 뒤 리모컨 Enter는 공타, �
 test('E2E 39: 리모컨 버튼 지정 — 이름 칸 입력은 안 배우고, 취소하면 지난 지정 유지', async () => {
   const p = await open({ hash: '#score', noWait: true });
   const keys = () => p.evaluate(() => localStorage.getItem('cue3-keys'));
-  await p.click('#scKeyLearn');
+  await p.click('#scMore > summary'); await p.click('#scKeyLearn');
   await p.click('#scPlayers input[data-k="name"]'); await p.keyboard.type('abc');
   assert.equal(await keys(), null);
   assert.match(await p.textContent('#scKeyStep'), /^1\/3/);
@@ -571,7 +574,7 @@ test('E2E 40: 경기 시작하면 점수판이 화면 안에, 새 경기는 맨 
 });
 test('E2E 41: 새로 고쳐도 되돌리기와 연장 기록이 남고, 탭을 다녀오면 샷 클락은 이어 감', async () => {
   const p = await open({ hash: '#score', noWait: true });
-  await p.click('#scClockSeg [data-v="30"]'); await p.click('#scStart');
+  await p.click('#scMore > summary'); await p.click('#scClockSeg [data-v="30"]'); await p.click('#scStart');
   await p.click('#scExt'); await p.click('#scHit');
   await p.reload(); await p.waitForSelector('#scGame:not([hidden])');
   assert.equal(await p.isDisabled('#scExt'), true);
@@ -737,7 +740,7 @@ test('E2E 49: 클럽 — 기본 이름 경기는 안 올리고, 끝난 경기를
   const p = await openMock({ hash: '#score', noWait: true });
   await p.waitForSelector('#clubWriteRow:not([hidden])');
   assert.equal(await p.isChecked('#clubAuto'), true);
-  await p.check('#scLive');
+  await p.click('#scMore > summary'); await p.check('#scLive');
   const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('1'); await t[1].fill('1');
   await p.click('#scStart'); await p.click('#scMiss'); await p.click('#scHit');
   await p.waitForFunction(() => /이름을 적은 2인 이상/.test(document.querySelector('#toast').textContent));
@@ -1111,5 +1114,89 @@ test('E2E 64: 사진 도움말은 사진 없이 공 놓기가 먼저, 찍는 법
   await p.click('#btnConfirm');
   await p.waitForSelector('#viewTable:not([hidden])');
   assert.equal(await p.$eval('#photoCard', e => e.classList.contains('compact')), true);
+  noErr(p); await p.context().close();
+});
+test('E2E 65: 세로 큰 화면은 숫자가 크고 득점 버튼이 아래, 320px에서 공타 버튼이 카드 밖으로 안 넘침, 차례 배지는 길게 안 늘어남', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  await p.setViewportSize({ width: 400, height: 860 });
+  await p.click('#scStart'); await p.click('#scHit'); await p.click('#scBig');
+  const r = await p.evaluate(() => ({
+    fs: parseFloat(getComputedStyle(document.querySelector('#scBoard .sc-score b')).fontSize),
+    hit: document.querySelector('#scHit').getBoundingClientRect().bottom, ih: innerHeight,
+    badge: document.querySelector('#scBoard .badge').getBoundingClientRect().height
+  }));
+  assert.ok(r.fs > 120, JSON.stringify(r));
+  assert.ok(r.hit > r.ih * 0.7 && r.hit <= r.ih, JSON.stringify(r));
+  assert.ok(r.badge < 26, JSON.stringify(r));
+  // 3명 이상은 두 줄 배치
+  await p.click('#scBig'); await p.click('#scNew'); await p.click('#scNew');
+  await p.click('#scPlus'); await p.click('#scStart'); await p.click('#scBig');
+  const cols = await p.$$eval('#scBoard .sc-p', e => new Set(e.map(x => Math.round(x.getBoundingClientRect().left))).size);
+  assert.equal(cols, 2);
+  await p.setViewportSize({ width: 320, height: 640 });
+  await p.click('#scBig'); await p.click('#scNew'); await p.click('#scNew');
+  await p.click('#scMinus'); await p.click('#scStart'); await p.click('#scBig');
+  const w = await p.evaluate(() => [document.querySelector('#scMiss').getBoundingClientRect().right, document.querySelector('#scGame').getBoundingClientRect().right]);
+  assert.ok(w[0] <= w[1], JSON.stringify(w));
+  noErr(p); await p.context().close();
+});
+test('E2E 66: 경기 설정 — 칸 머리글, 시작 버튼은 명단 저장 바로 아래, 추가 설정은 접혀 있다가 바꾼 설정이 있으면 펼쳐서 시작', async () => {
+  const p = await open({ hash: '#score', noWait: true, w: 360 });
+  assert.equal(await p.textContent('#scSetup .pl-head'), '이름목표 점수(핸디)');
+  assert.equal(await p.$eval('#scStart', e => !!e.previousElementSibling.querySelector('#scRosterSave')), true);
+  assert.equal(await p.$eval('#scMore', e => e.open), false);
+  assert.equal(await p.isVisible('#scTeam'), false);
+  await p.click('#scMore > summary');
+  // 체크박스는 설명 길이와 상관없이 줄 오른쪽 끝
+  const pos = await p.$$eval('#scTeam, #scVoice', e => e.map(x => x.parentElement.getBoundingClientRect().right - x.getBoundingClientRect().right));
+  assert.ok(pos.every(d => Math.abs(d) <= 1), JSON.stringify(pos));
+  await p.check('#scTeam');
+  await p.reload(); await p.waitForSelector('#scSetup:not([hidden])');
+  assert.equal(await p.$eval('#scMore', e => e.open), true);
+  await p.uncheck('#scTeam');
+  await p.reload(); await p.waitForSelector('#scSetup:not([hidden])');
+  assert.equal(await p.$eval('#scMore', e => e.open), false);
+  noErr(p); await p.context().close();
+});
+test('E2E 67: 4구 결과 복사·에버·안내 글, 끝나면 같은 설정으로 한 판 더와 순서 바꿔서', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  await p.click('#scType [data-v="4b"]');
+  const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('10'); await t[1].fill('10');
+  await p.click('#scStart');
+  assert.match(await p.textContent('#scNote'), /^득점하면 \+10, 못 맞히면 공타\./);
+  assert.equal(await p.isVisible('#scAgain'), false);
+  await p.click('#scHit'); await p.click('#scMiss');
+  assert.match(await p.textContent('#scMsg'), /선수 A 승/);
+  assert.match(await p.textContent('#scBoard'), /에버 10\.0하이런/);
+  await p.click('#scCopy');
+  const clip = await p.evaluate(() => navigator.clipboard.readText());
+  assert.match(clip, /^4구 경기 /);
+  assert.match(clip, /선수 A {2}10\/10점 {2}1이닝 {2}에버 10\.0 {2}하이런 10/);
+  // 순서 바꿔서: 같은 종목·점수로 B가 먼저
+  await p.click('#scSwap');
+  assert.deepEqual(await p.$$eval('#scBoard .pname span:first-child', e => e.map(x => x.textContent)), ['선수 B', '선수 A']);
+  assert.deepEqual(await p.$$eval('.sc-score b', e => e.map(x => x.textContent)), ['0', '0']);
+  assert.equal(await p.textContent('#scHit'), '+10 득점');
+  assert.equal(await p.isVisible('#scAgain'), false);
+  await p.click('#scHit'); await p.click('#scMiss');
+  await p.click('#scAgain');
+  assert.deepEqual(await p.$$eval('#scBoard .pname span:first-child', e => e.map(x => x.textContent)), ['선수 B', '선수 A']);
+  assert.match(await p.textContent('#scInfo'), /1이닝 · 선수 B 차례/);
+  assert.ok((await p.textContent('#scHist')).includes('선수 B'));
+  noErr(p); await p.context().close();
+});
+test('E2E 68: 혼자 연습은 목표를 못 채우면 배지 없음, 채우면 달성', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  await p.click('#scMinus');
+  await p.click('#scMore > summary'); await p.fill('#scLimit', '1');
+  await p.click('#scStart'); await p.click('#scHit'); await p.click('#scMiss');
+  assert.match(await p.textContent('#scMsg'), /1이닝 동안 1점/);
+  assert.equal(await p.$$eval('#scBoard .badge', e => e.length), 0);
+  assert.equal(await p.$eval('#scBoard .sc-p', e => e.classList.contains('win')), false);
+  assert.equal(await p.isVisible('#scSwap'), false);
+  await p.click('#scNew');
+  await p.fill('#scPlayers input[data-k="target"]', '1');
+  await p.click('#scStart'); await p.click('#scHit');
+  assert.equal(await p.textContent('#scBoard .badge'), '달성');
   noErr(p); await p.context().close();
 });
