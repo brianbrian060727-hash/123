@@ -923,3 +923,87 @@ test('E2E 58: 시스템 표 — 다이아몬드·쿠션·모양 열, 3팁은 중
   }
   noErr(p); await p.context().close();
 });
+// 연습 문제: 칩 제목('빨간공 · 돌리기' / '빈쿠션 1쿠션')을 퀴즈 답(첫 공|길 이름)으로
+const BALLKEY = { 빨간공: 'red', 노란공: 'yellow', 흰공: 'white' };
+const quizKey = t => { const m = t.trim().split(' · '); return m.length > 1 ? `${BALLKEY[m[0]]}|${m[1]}` : `cushion|${m[0]}`; };
+// 새 배치 계산이 끝날 때까지 (아주 드물게 길이 없는 무작위 배치면 false)
+async function quizReady(p) {
+  await p.waitForFunction(() => !document.querySelector('#solChips .chip.skel') && (document.getElementById('btnReveal') || /찾지 못했어요/.test(document.getElementById('solDetail').textContent)), null, { timeout: 30000 });
+  return !!(await p.$('#btnReveal'));
+}
+test('E2E 59: 연습 문제 — 첫 공·길 이름을 맞히면 결과와 오늘 점수, 같은 배치는 한 번만 세고, 다음 문제는 새 배치를 가림', async () => {
+  const p = await open();
+  const titles = await p.$$eval('#solChips .chip .t', e => e.map(x => x.textContent));
+  const right = new Set(titles.map(quizKey));
+  await p.check('#hideIn');
+  await p.waitForSelector('#solDetail [data-q="1"]');
+  assert.equal(await p.$$eval('#solChips .chip', e => e.length), 0);
+  assert.equal(await p.isVisible('#recStrip'), false);
+  assert.equal(await p.isVisible('#btnQuizRandom'), true);
+  assert.equal(await p.isVisible('#btnReveal'), true);
+  assert.equal(await p.$('#solDetail [data-q="2"]'), null, 'Q2는 Q1에 답한 뒤에');
+  assert.deepEqual(await p.$$eval('#solDetail [data-q="1"]', e => e.map(x => x.dataset.v)), ['red', 'yellow', 'cushion']);
+  assert.equal(await p.textContent('#quizTally'), '오늘 0문제 중 0개 맞힘');
+  // 틀린 답: 빨간공 + 추천에 없는 길 이름
+  await p.click('#solDetail [data-q="1"][data-v="red"]');
+  const names = await p.$$eval('#solDetail [data-q="2"]', e => e.map(x => x.dataset.v));
+  assert.ok(names.length >= 2 && names.length <= 4 && new Set(names).size === names.length, names.join(','));
+  const wrong = names.find(n => !right.has('red|' + n));
+  assert.ok(wrong, '오답 보기가 하나는 있어야 함');
+  await p.click(`#solDetail [data-q="2"][data-v="${wrong}"]`);
+  assert.ok(await p.$$eval('#solChips .chip', e => e.length) > 0, '답하면 칩이 다시 보임');
+  assert.match(await p.textContent('#quizFb'), /^아쉬워요\. 이 배치는 .+(이|가) 가장 무난해요 \(±\d+mm\)오늘 1문제 중 0개 맞힘$/);
+  assert.equal(await p.getAttribute('#solChips .chip[data-i="0"]', 'aria-pressed'), 'true');
+  assert.equal(await p.textContent('#btnPlay span'), '멈추기', '답하면 샷을 바로 보여 줌');
+  assert.equal(await p.isVisible('#btnNextQ'), true);
+  // 다시 가리고 맞는 답: 길 1과 같다고 알려 주지만 같은 배치라 점수는 그대로
+  await p.uncheck('#hideIn'); await p.check('#hideIn');
+  assert.equal(await p.isVisible('#quizFb'), false);
+  const [a1, a2] = quizKey(titles[0]).split('|');
+  await p.click(`#solDetail [data-q="1"][data-v="${a1}"]`);
+  await p.click(`#solDetail [data-q="2"][data-v="${a2}"]`);
+  assert.match(await p.textContent('#quizFb'), /^정답! 길 1\(.+\)과 같아요오늘 1문제 중 0개 맞힘$/);
+  const saved = JSON.parse(await p.evaluate(() => localStorage.getItem('cue3-practice')));
+  assert.deepEqual({ n: saved.n, ok: saved.ok }, { n: 1, ok: 0 });
+  assert.match(saved.day, /^\d{4}-\d{2}-\d{2}$/);
+  // 다음 문제: 새 무작위 배치, 정답은 다시 가림
+  const code = await p.inputValue('#codeOut');
+  await p.click('#btnNextQ');
+  assert.notEqual(await p.inputValue('#codeOut'), code);
+  assert.match(await p.textContent('#status'), /무작위 배치/);
+  if (await quizReady(p)) {
+    assert.equal(await p.isVisible('#btnReveal'), true);
+    assert.equal(await p.$$eval('#solChips .chip', e => e.length), 0);
+    assert.equal(await p.textContent('#quizTally'), '오늘 1문제 중 0개 맞힘');
+  }
+  assert.equal(await p.isVisible('#quizFb'), false);
+  // 접힌 문제집을 열지 않아도 '무작위 문제'로 새 배치
+  const code2 = await p.inputValue('#codeOut');
+  await p.click('#btnQuizRandom');
+  assert.notEqual(await p.inputValue('#codeOut'), code2);
+  if (await quizReady(p)) assert.equal(await p.isVisible('#btnReveal'), true);
+  noErr(p); await p.context().close();
+});
+test('E2E 60: 연습 문제 — 어제 점수는 새로 시작하고, 직접 쳐서 득점하면 추천 길과 비교해 맞힌 문제로 셈', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 400, height: 900 } });
+  await ctx.addInitScript(() => localStorage.setItem('cue3-practice', JSON.stringify({ day: '2000-01-01', n: 9, ok: 7 })));
+  const p = await ctx.newPage();
+  p.errors = []; p.on('pageerror', e => p.errors.push(e.message));
+  await p.goto('file://' + page);
+  await p.waitForSelector('#solChips .chip:not(.skel)', { timeout: 30000 });
+  const title = (await p.textContent('#solChips .chip[data-i="0"] .t')).trim();
+  // 가리기 전에 1번 길로 조준해 둔 뒤 가리고 '직접 쳐 보기'
+  await p.click('#mAim');
+  assert.match(await p.textContent('#aimTable'), /득점/);
+  assert.equal(await p.isVisible('#aimFb'), false, '정답을 가리지 않으면 비교 안내 없음');
+  await p.click('#mRec'); await p.check('#hideIn');
+  assert.equal(await p.textContent('#quizTally'), '오늘 0문제 중 0개 맞힘');
+  await p.click('#btnQuizAim');
+  assert.equal(await p.isVisible('#aimPanel'), true);
+  assert.match(await p.textContent('#aimFb'), new RegExp(`^득점! 추천 길 1\\(${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)과 같은 길이에요 · 여유 ±\\d+mm$`));
+  // 조준을 조금 바꿔 다시 득점해도 한 번만 셈
+  await p.click('.nudge button[data-d="0.1"]'); await p.click('.nudge button[data-d="-0.1"]');
+  await p.click('#mRec');
+  assert.equal(await p.textContent('#quizTally'), '오늘 1문제 중 1개 맞힘');
+  noErr(p); await ctx.close();
+});

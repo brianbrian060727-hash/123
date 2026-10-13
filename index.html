@@ -209,7 +209,16 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
 .scroll-x { overflow-x: auto; }
 .mini { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 4px 9px; font-size: 12.5px; font-weight: 600; min-height: 32px; }
 .mini.del { color: var(--bad); }
-.hide-ans { display: grid; gap: 10px; justify-items: start; }
+/* 연습 문제: 첫 공 → 길 이름 두 단계 */
+.practice-row { justify-content: space-between; }
+.quiz { display: grid; gap: 12px; }
+.quiz .q { display: grid; gap: 6px; }
+.quiz .q > b { font-size: 14px; }
+.qopts { display: flex; gap: 6px; flex-wrap: wrap; }
+.qopts .btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
+.quiz-fb { margin: 0; padding: 9px 12px; border-radius: 10px; font-size: 14px; background: color-mix(in srgb, var(--good) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--good) 35%, transparent); }
+.quiz-fb.miss { background: color-mix(in srgb, var(--warn) 12%, var(--surface)); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.quiz-fb .sub { display: block; margin-top: 2px; }
 
 /* 점수판 */
 .sc-board { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -503,7 +512,11 @@ details.settings { box-shadow: var(--shadow); }
 
     <div id="recPanel" class="panel">
       <div class="panel-head"><h2>추천 길</h2><span class="sub" id="recSub"></span></div>
-      <label class="row-inline sub" for="hideIn"><input type="checkbox" id="hideIn"> 연습: 정답 가리고 먼저 생각해 보기</label>
+      <div class="row-inline practice-row">
+        <label class="row-inline sub" for="hideIn"><input type="checkbox" id="hideIn"> 연습: 정답 가리고 먼저 생각해 보기</label>
+        <button type="button" class="btn sm" id="btnQuizRandom" hidden>무작위 문제</button>
+      </div>
+      <div class="quiz-fb" id="quizFb" aria-live="polite" hidden></div>
       <div class="chips" id="solChips" role="group" aria-label="추천 공략 목록"></div>
       <div id="solDetail"></div>
     </div>
@@ -542,6 +555,7 @@ details.settings { box-shadow: var(--shadow); }
           <button type="button" data-d="0.5" aria-label="0.5도 오른쪽">크게 ▶</button>
         </div>
       </div>
+      <p class="quiz-fb" id="aimFb" aria-live="polite" hidden></p>
       <table class="kv" id="aimTable"></table>
     </div>
 
@@ -1580,7 +1594,7 @@ if (typeof module !== 'undefined') module.exports = Core;
   function requestSolve() {
     stopAnim(); if (state.mode === 'sys') { state.sys.rows = sysRows(); renderSys(); } if (typeof renderCode === 'function') renderCode();
     // 지난 길을 새 배치의 공 이름·조준점으로 보여 주지 않게 바로 비움
-    state.solving = true; state.solveId++; state.sols = []; state.sel = 0;
+    state.solving = true; state.solveId++; state.sols = []; state.sel = 0; quiz = null;
     renderStatus(); renderRec(); if (state.mode === 'rec') drawTable();
     if (!worker) { solveMain(state.solveId); return; }
     if (busy) { pending = true; return; }
@@ -1592,8 +1606,10 @@ if (typeof module !== 'undefined') module.exports = Core;
     const out = list.filter(s => { const k = routeName(s.rec).name + '|' + (s.rec.contact ? s.rec.contact.idx : -1); cnt[k] = (cnt[k] || 0) + 1; return cnt[k] <= 2; });
     const keep = new Set(out.filter(s => s.tolMM >= 2));
     for (const s of out) if (keep.size < 3) keep.add(s);
-    state.sols = out.filter(s => keep.has(s)).slice(0, 6); state.sel = 0; state.solving = false; state.revealed = false;
+    state.sols = out.filter(s => keep.has(s)).slice(0, 6); state.sel = 0; state.solving = false; state.revealed = false; quiz = null;
+    solvedFor = layoutCode();
     renderStatus(); renderRec(); drawTable();
+    if (state.mode === 'aim') renderAimFb(Engine.makeCtx(ctxObj()));
   }
 
   // ---------- 표기 ----------
@@ -1775,8 +1791,98 @@ if (typeof module !== 'undefined') module.exports = Core;
     e.preventDefault(); $('#solDetail').scrollIntoView({ block: 'start', behavior: motion() });
   });
 
+  // ---------- 연습 문제 (정답 가리기) ----------
+  // 받침 유무로 조사 고르기 (숫자는 읽는 소리 기준)
+  const batchim = w => {
+    const c = String(w).trim().slice(-1);
+    if (/\d/.test(c)) return '013678'.includes(c);
+    const k = c.charCodeAt(0) - 0xAC00;
+    return k >= 0 && k < 11172 && k % 28 !== 0;
+  };
+  const gwa = w => batchim(w) ? '과' : '와', iga = w => batchim(w) ? '이' : '가';
+  const QUIZ_DECOY = ['돌리기', '횡단샷', '비껴치기', '대회전', '빈쿠션 1쿠션'];
+  // solvedFor: 지금 추천 길을 계산한 배치 (공을 끄는 도중이면 다름)
+  let quiz = null, quizFbHTML = '', solvedFor = '';
+  // 첫 공: 빈쿠션이면 'cushion', 아니면 처음 맞는 적구 키
+  const firstOf = s => s.rec.evs.findIndex(e => e.type === 'b') > 0 ? 'cushion' : objKey(s.rec.contact.idx);
+  function makeQuiz() {
+    const names = [...new Set(state.sols.map(s => routeName(s.rec).name))].slice(0, 3);
+    const decoy = QUIZ_DECOY.filter(n => !names.includes(n));
+    if (decoy.length) names.splice(Math.floor(Math.random() * (names.length + 1)), 0, decoy[Math.floor(Math.random() * decoy.length)]);
+    return { names, a1: null, a2: null, ok: false, msg: '' };
+  }
+  // 하루 점수: 날짜가 바뀌면 새로. 같은 배치는 한 번만 셈
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  let practice = { day: '', n: 0, ok: 0 }, practiceKey = '';
+  try {
+    const p = JSON.parse(localStorage.getItem('cue3-practice') || 'null');
+    if (p && typeof p.day === 'string') {
+      const n = Math.max(0, Math.floor(+p.n) || 0);
+      practice = { day: p.day, n, ok: Math.min(n, Math.max(0, Math.floor(+p.ok) || 0)) };
+    }
+  } catch (e) { /* 저장소 없음 */ }
+  function practiceToday() {
+    const d = today();
+    if (practice.day !== d) practice = { day: d, n: 0, ok: 0 };
+    return practice;
+  }
+  const tallyText = () => { const p = practiceToday(); return `오늘 ${p.n}문제 중 ${p.ok}개 맞힘`; };
+  function countPractice(ok) {
+    const key = layoutCode();
+    if (key === practiceKey) return;
+    practiceKey = key;
+    const p = practiceToday(); p.n++; if (ok) p.ok++;
+    try { localStorage.setItem('cue3-practice', JSON.stringify(p)); } catch (e) { /* 무시 */ }
+    const t = $('#quizTally'); if (t) t.textContent = tallyText();
+  }
+  function answerQuiz() {
+    const C = Engine.makeCtx(ctxObj());
+    const i = state.sols.findIndex(s => firstOf(s) === quiz.a1 && routeName(s.rec).name === quiz.a2);
+    const s = state.sols[Math.max(0, i)], title = brief(s, C).title;
+    quiz.ok = i >= 0;
+    quiz.msg = quiz.ok ? `<b>정답!</b> 길 ${i + 1}(${title})${gwa(i + 1)} 같아요` : `<b>아쉬워요.</b> 이 배치는 ${title}${iga(title)} 가장 무난해요 (±${s.tolMM.toFixed(0)}mm)`;
+    countPractice(quiz.ok);
+    stopAnim();
+    state.revealed = true; state.sel = Math.max(0, i);
+    renderRec(); drawTable(); playShot();
+  }
+  function renderQuiz(det) {
+    if (!quiz) quiz = makeQuiz();
+    const opt = (q, v, label) => `<button type="button" class="btn sm" data-q="${q}" data-v="${v}" aria-pressed="${quiz['a' + q] === v}">${label}</button>`;
+    det.innerHTML = `<div class="quiz">
+      <p class="empty">득점 길을 ${state.sols.length}가지 찾았어요. 정답을 보기 전에 맞혀 보세요.</p>
+      <div class="q"><b>Q1. 어느 공을 먼저 맞힐까요?</b><div class="qopts" role="group" aria-label="첫 공">${opt(1, 'red', BALLNAME.red)}${opt(1, otherKey(), BALLNAME[otherKey()])}${opt(1, 'cushion', '쿠션 먼저(빈쿠션)')}</div></div>
+      ${quiz.a1 ? `<div class="q"><b>Q2. 어떤 길로?</b><div class="qopts" role="group" aria-label="길 이름">${quiz.names.map(n => opt(2, n, n)).join('')}</div></div>` : ''}
+      <div class="detail-actions"><button type="button" class="btn sm" id="btnReveal">정답 바로 보기</button><button type="button" class="btn sm" id="btnQuizAim">직접 쳐 보기</button></div>
+      <p class="sub" id="quizTally">${tallyText()}</p>
+    </div>`;
+    det.querySelectorAll('[data-q]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.q === '1') {
+        const first = !quiz.a1;
+        quiz.a1 = b.dataset.v; renderRec();
+        // 처음 고르면 Q2 첫 보기로 초점 이동
+        if (first) { const q2 = $('#solDetail [data-q="2"]'); if (q2) q2.focus({ preventScroll: true }); }
+      } else { quiz.a2 = b.dataset.v; answerQuiz(); }
+    }));
+    $('#btnReveal').addEventListener('click', () => { state.revealed = true; renderRec(); drawTable(); });
+    $('#btnQuizAim').addEventListener('click', () => { setMode('aim'); $('#cvTable').scrollIntoView({ block: 'nearest', behavior: motion() }); });
+  }
+  // 답한 뒤 칩 위에 결과와 오늘 점수
+  function renderQuizFb() {
+    const fb = $('#quizFb');
+    const show = state.hideAns && state.revealed && !!quiz && !!quiz.msg && state.sols.length > 0;
+    const html = show ? `${quiz.msg}<span class="sub">${tallyText()}</span>` : '';
+    fb.hidden = !show; fb.classList.toggle('miss', show && !quiz.ok);
+    if (html !== quizFbHTML) { fb.innerHTML = html; quizFbHTML = html; }
+  }
+  function nextProblem() {
+    setBalls(randomBalls(), 'random');
+    $('#cvTable').scrollIntoView({ block: 'nearest', behavior: motion() });
+  }
+
   function renderRec() {
     const chips = $('#solChips'), det = $('#solDetail');
+    renderQuizFb();
     $('#recSub').textContent = state.solving ? '모든 각도·당점을 시험하는 중' : (state.sols.length ? `${state.sols.length}가지 · 추천 순` : '');
     renderStrip();
     if (state.solving && !state.sols.length) {
@@ -1790,8 +1896,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     }
     if (state.hideAns && !state.revealed) {
       chips.innerHTML = '';
-      det.innerHTML = `<div class="hide-ans"><p class="empty">득점 길을 ${state.sols.length}가지 찾았어요. 직접 조준에서 먼저 쳐 보거나 머릿속으로 길을 그려 본 뒤 정답을 확인하세요.</p><button type="button" class="btn primary" id="btnReveal">정답 보기</button></div>`;
-      $('#btnReveal').addEventListener('click', () => { state.revealed = true; renderRec(); drawTable(); });
+      renderQuiz(det);
       return;
     }
     const C = Engine.makeCtx(ctxObj());
@@ -1828,11 +1933,12 @@ if (typeof module !== 'undefined') module.exports = Core;
       <tr><th>위험</th><td>${risks.join(' ')}</td></tr>
     </table>
     <div class="tipbox">${routeTips(s).map(t => `<div><b>${t[0]}</b>${t[1]}</div>`).join('')}</div>
-    <div class="detail-actions"><button type="button" class="btn sm primary" id="btnPlay2">샷 보기</button><button type="button" class="btn sm" id="btnTryAim">이 길로 직접 조준해 보기</button><button type="button" class="btn sm" id="btnCoach"${Ai.sample ? '' : ' hidden'}>Claude 코치에게 설명 듣기</button></div>
+    <div class="detail-actions"><button type="button" class="btn sm primary" id="btnPlay2">샷 보기</button><button type="button" class="btn sm" id="btnTryAim">이 길로 직접 조준해 보기</button><button type="button" class="btn sm" id="btnCoach"${Ai.sample ? '' : ' hidden'}>Claude 코치에게 설명 듣기</button>${state.hideAns ? '<button type="button" class="btn sm primary" id="btnNextQ">다음 문제 ▶</button>' : ''}</div>
     <div class="coach" id="coachOut" aria-live="polite" hidden></div>`;
     $('#btnCoach').addEventListener('click', coach);
     $('#btnPlay2').addEventListener('click', () => { $('#cvTable').scrollIntoView({ block: 'nearest', behavior: motion() }); if (!anim) playShot(); });
     $('#btnTryAim').addEventListener('click', () => $('#mAim').click());
+    if (state.hideAns) $('#btnNextQ').addEventListener('click', nextProblem);
   }
 
   // ---------- 당구대 그리기 ----------
@@ -2336,6 +2442,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     $('#tipCap').textContent = tipText(a.E, a.vk);
     drawTipPicker();
     [...$('#powSeg').children].forEach((b, i) => b.setAttribute('aria-pressed', String(i + 1 === a.power)));
+    renderAimFb(C);
     if (!sh) return;
     const rec = sh.rec;
     let res;
@@ -2359,6 +2466,22 @@ if (typeof module !== 'undefined') module.exports = Core;
       <tr><th>필요한 힘</th><td>${needTxt}</td></tr>`;
     // 결과가 같으면 표를 다시 쓰지 않음(끄는 동안)
     if (html !== aimHTML) { aimHTML = html; $('#aimTable').innerHTML = html; }
+  }
+  // 정답 가리기 중 직접 쳐서 득점하면 추천 길과 비교해 알려 주고 맞힌 문제로 셈
+  let aimFbHTML = '';
+  function renderAimFb(C) {
+    const sh = aimShot, fb = $('#aimFb');
+    let html = '';
+    if (sh && state.hideAns && !state.revealed && !state.solving && solvedFor === layoutCode() && sh.rec.success && sh.geo.success) {
+      const i = state.sols.findIndex(s => s.sig === sh.geo.sig);
+      if (i >= 0) {
+        const s = state.sols[i];
+        html = `<b>득점!</b> 추천 길 ${i + 1}(${brief(s, C).title})${gwa(i + 1)} 같은 길이에요 · 여유 ±${s.tolMM.toFixed(0)}mm`;
+      } else html = '<b>득점 길이에요!</b> 추천 목록에는 없는 길을 찾았네요';
+      countPractice(true);
+    }
+    fb.hidden = !html;
+    if (html !== aimFbHTML) { fb.innerHTML = html; aimFbHTML = html; }
   }
   // 당점 선택기
   const tipEl = $('#tipSvg');
@@ -2772,7 +2895,12 @@ if (typeof module !== 'undefined') module.exports = Core;
   bindSeg('#segBg', 'showPhoto', () => drawTable());
   bindSeg('#segPlay', 'playSpeed');
   $('#hideIn').checked = !!state.hideAns;
-  $('#hideIn').addEventListener('change', e => { state.hideAns = e.target.checked; state.revealed = false; saveSettings(); stopAnim(); renderRec(); drawTable(); });
+  $('#btnQuizRandom').hidden = !state.hideAns;
+  $('#hideIn').addEventListener('change', e => {
+    state.hideAns = e.target.checked; state.revealed = false; quiz = null; $('#btnQuizRandom').hidden = !state.hideAns;
+    saveSettings(); stopAnim(); renderRec(); drawTable();
+  });
+  $('#btnQuizRandom').addEventListener('click', () => nextProblem());
   const spinIn = $('#spinIn');
   spinIn.value = state.spinGain; $('#spinOut').textContent = '×' + (+state.spinGain).toFixed(2).replace(/0$/, '');
   spinIn.addEventListener('input', () => { state.spinGain = +spinIn.value; $('#spinOut').textContent = '×' + state.spinGain.toFixed(2).replace(/0$/, ''); if (state.mode === 'aim') { updateAim(); drawTable(); } });
@@ -2804,7 +2932,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     return out;
   }
   $('#btnRandom').addEventListener('click', () => {
-    setBalls(randomBalls(), 'saved');
+    setBalls(randomBalls(), 'random');
     $('#cvTable').scrollIntoView({ block: 'nearest' });
   });
   const layoutCode = () => Core.encodeLayout(state.table, state.myBall, state.balls);
