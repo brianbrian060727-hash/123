@@ -265,6 +265,7 @@ test('시스템 표: 17칸(반 포인트), 위 장쿠션 겨냥은 1쿠션이 �
 test('시스템 표: 코너(50)에서 1쿠션 3포인트 → 3쿠션 약 2포인트 (파이브앤하프 기준 샷)', () => {
   const rows = Engine.sysTable({ table: 'daedae', cue: { x: 2.75, y: 1.33 }, objs: [{ x: 1, y: 1 }, { x: 2, y: 0.5 }] }, { rail: 2, E: 2, auto: true });
   const r = rows.find(x => x.aim === 3);
+  // 겨냥을 쿠션 지점에서 다이아몬드 줄로 바꾼 뒤 약 2.2 → 1.6으로 옮겨 감(범위 안)
   assert.ok(r.E < 0, '오른쪽 아래 코너에서 위 장쿠션 왼쪽을 겨냥하면 순회전은 왼쪽 당점');
   assert.ok(r.ok && r.third.rail === 0 && r.third.pt > 1.4 && r.third.pt < 2.6, JSON.stringify(r.third));
   const run = rows.filter(x => x.ok && x.third.rail === 0 && x.aim >= 1.5 && x.aim <= 3.5);
@@ -286,4 +287,106 @@ test('시스템 표: 순회전은 겨냥 방향에 따라 당점 좌우가 바�
   assert.ok(rows[2].E < 0 && rows[14].E > 0);
   const flip = Engine.sysTable({ table: 'daedae', cue: { x: 1.4, y: 1.0 }, objs: [{ x: 1, y: 1 }, { x: 2, y: 0.5 }] }, { rail: 2, E: 2, auto: true, flip: true });
   assert.ok(flip[2].E > 0 && flip[14].E < 0);
+});
+
+// ---------- 엔진 신뢰도: 붙은 공 · 미스큐 · 다이아몬드 · 쿠션 반발 · 순회전 ----------
+const DH = Engine.TABLES.daedae.H, DW = Engine.TABLES.daedae.W, BR = Engine.R;
+const solved = new Map();
+function solveOnce(o) {
+  const k = JSON.stringify(o);
+  if (!solved.has(k)) solved.set(k, Engine.solve(o, { N: 1600 }));
+  return solved.get(k);
+}
+// 화면 좌표(y 아래쪽)로 쿠션에 딱 붙은 수구: 아래·위·왼쪽 쿠션
+const FROZEN = [
+  { table: 'daedae', cue: { x: 1.0, y: DH - BR }, objs: [{ x: 1.6, y: 0.7 }, { x: 2.3, y: 0.4 }] },
+  { table: 'daedae', cue: { x: 0.5, y: BR }, objs: [{ x: 1.6, y: 0.7 }, { x: 2.3, y: 0.4 }] },
+  { table: 'daedae', cue: { x: BR, y: 0.6 }, objs: [{ x: 1.2, y: 0.5 }, { x: 2.0, y: 1.0 }] }
+];
+test('엔진: 쿠션에 붙은 수구는 그 쿠션으로 0mm 1쿠션을 만들지 않음', () => {
+  for (const o of FROZEN) {
+    const r = solveOnce(o);
+    assert.ok(r.list.length > 0, '길이 하나는 있어야 함');
+    for (const s of r.list) {
+      assert.ok(!(s.rec.evs[0].type === 'c' && s.rec.segLens[0] < 0.004), JSON.stringify(s.rec.evs[0]));
+    }
+  }
+  // 붙은 쿠션 쪽으로 곧장 치면 frozen
+  const C = Engine.makeCtx(FROZEN[0]);
+  const rec = Engine.sim(C, -Math.PI / 2, 0, 2, true);
+  assert.equal(rec.success, false); assert.equal(rec.reason, 'frozen');
+  assert.equal(Engine.sim(C, -Math.PI / 3, 1, 1, false), 0);
+});
+test('엔진: 미스큐 당점(±3팁+상단/하단)은 추천하지 않음', () => {
+  assert.equal(Engine.TIPMAX, 0.62);
+  const top = Engine.VERT.findIndex(v => v.key === 'top'), low = Engine.VERT.findIndex(v => v.key === 'low');
+  const midtop = Engine.VERT.findIndex(v => v.key === 'midtop');
+  for (const E of [-3, 3]) { assert.ok(!Engine.tipOK(E, top)); assert.ok(!Engine.tipOK(E, low)); assert.ok(Engine.tipOK(E, midtop)); }
+  assert.ok(Engine.tipOK(2, top) && Engine.tipOK(-2, low) && Engine.tipOK(0, top));
+  seed = 777;
+  const layouts = [layout('daedae'), layout('daedae'), layout('jungdae'), ...FROZEN];
+  for (const o of layouts) {
+    for (const s of solveOnce(o).list) {
+      assert.ok(Engine.tipOK(s.E, s.vk), `E ${s.E} vk ${s.vk}`);
+      assert.ok(s.tolMM >= 1, 'tol ≥ 1mm');
+      assert.ok(s.ease > 0 && s.ease <= s.width / 1.2 + 1e-9 && s.ease <= s.tolMM / 14 + 1e-9, 'ease');
+    }
+  }
+});
+test('엔진: 다이아몬드 겨냥점은 쿠션 지점보다 바깥 다이아몬드 줄', () => {
+  const C = Engine.makeCtx({ table: 'daedae', cue: { x: 1.0, y: DH - 0.5 }, objs: [{ x: 2, y: 1 }, { x: 2.5, y: 1 }] });
+  const th = 1.2, dh = Engine.diamondHit(C, th), rh = Engine.railHit(C, th);
+  assert.equal(dh.rail, 2); assert.equal(rh.rail, 2);
+  assert.equal(dh.y, C.H);
+  assert.ok(dh.x - C.cue.x > rh.x - C.cue.x + 0.01, `${dh.x} vs ${rh.x}`);
+  assert.ok(Math.abs(dh.x - (C.cue.x + (C.H + Engine.DIA - C.cue.y) / Math.tan(th))) < 1e-9);
+  // 코너 근처: 쿠션은 위 장쿠션에 닿아도 다이아몬드 줄은 오른쪽 단쿠션에 먼저 걸림
+  const p = { x: DW - BR - 0.01, y: DH - BR }, th2 = Math.atan2(p.y - C.cue.y, p.x - C.cue.x);
+  const C2 = Object.assign({}, C, { cue: { x: p.x - 2 * 0.3, y: p.y - 0.3 } });
+  assert.equal(Engine.railHit(C2, th2).rail, 2);
+  const d2 = Engine.diamondHit(C2, th2);
+  assert.equal(d2.rail, 1); assert.equal(d2.x, DW); assert.ok(d2.y >= 0 && d2.y <= DH);
+  // 앱이 다이아몬드를 그리는 자리와 같은 값
+  const m = require('./load').html.match(/const RAILV = ([\d.]+), CUSH = ([\d.]+);/);
+  assert.ok(m && Math.abs((+m[1] + +m[2]) / 2 + 0.005 - Engine.DIA) < 1e-9);
+});
+test('엔진: 쿠션 반발계수(eC)를 바꾸면 같은 샷의 3쿠션 지점이 달라짐', () => {
+  const o = { table: 'daedae', cue: { x: 2.6, y: 1.2 }, objs: [{ x: -5, y: -5 }, { x: -6, y: -6 }] };
+  assert.equal(Engine.makeCtx(o).eC, Engine.P.eC);
+  const third = eC => {
+    const rec = Engine.sim(Engine.makeCtx(Object.assign({}, o, { eC })), 2.6, -2, 1, true);
+    return rec.evs.filter(e => e.type === 'c')[2];
+  };
+  const a = third(0.7), b = third(0.9);
+  assert.ok(a && b);
+  assert.ok(Math.hypot(a.x - b.x, a.y - b.y) > 0.02, `${JSON.stringify(a)} ${JSON.stringify(b)}`);
+  // 적구 경로도 같은 값을 씀
+  const ob = { x: 1.4, y: 0.7, vx: 0.6, vy: 0.8 };
+  const p1 = Engine.objectPath(Engine.makeCtx(Object.assign({}, o, { eC: 0.7 })), ob, 3).pts;
+  const p2 = Engine.objectPath(Engine.makeCtx(Object.assign({}, o, { eC: 0.9 })), ob, 3).pts;
+  assert.ok(Math.hypot(p1[2].x - p2[2].x, p1[2].y - p2[2].y) > 0.01);
+});
+test('엔진: 순회전 기록은 당점 좌우를 바꾸면 뒤집힘', () => {
+  const C = Engine.makeCtx({ table: 'daedae', cue: { x: 1.0, y: DH - 0.5 }, objs: [{ x: -5, y: -5 }, { x: -6, y: -6 }] });
+  const first = (th, E) => Engine.sim(C, th, E, 1, true).evs[0];
+  const r = first(1.0, 2), l = first(1.0, -2);
+  assert.equal(r.type, 'c'); assert.equal(r.rail, 2); assert.equal(l.rail, 2);
+  assert.equal(r.run, true); assert.equal(l.run, false);
+  // 왼쪽으로 가는 길에서는 왼쪽 당점이 순회전
+  assert.equal(first(Math.PI - 1.0, -2).run, true);
+  assert.equal(first(Math.PI - 1.0, 2).run, false);
+});
+test('시스템 표: 다이아몬드 줄을 겨냥하고 1쿠션 지점·모양·실패 사유를 줌', () => {
+  const o = { table: 'daedae', cue: { x: 2.75, y: 1.33 }, objs: [{ x: 1, y: 1 }, { x: 2, y: 0.5 }] };
+  const C = Engine.makeCtx(o);
+  const rows = Engine.sysTable(o, { rail: 2, E: 2, auto: true });
+  for (const [k, r] of rows.entries()) {
+    assert.ok(Math.abs(r.theta - Math.atan2(C.H + Engine.DIA - C.cue.y, k * C.W / 16 - C.cue.x)) < 1e-12);
+    if (r.ok) { assert.equal(r.why, null); assert.equal(r.shape.split('-')[0], '장'); assert.ok(r.contact >= 0 && r.contact <= 8); }
+    else assert.ok(['side', 'stop'].includes(r.why));
+  }
+  assert.equal(rows.find(x => x.aim === 3).shape, '장-단-장');
+  // 수구가 위 장쿠션에 붙어 있으면 그 쿠션 겨냥은 전부 frozen
+  const fz = Engine.sysTable({ table: 'daedae', cue: { x: 1.4, y: BR }, objs: o.objs }, { rail: 2, E: 2, auto: true });
+  assert.ok(fz.every(r => !r.ok && r.why === 'frozen'));
 });

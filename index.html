@@ -747,6 +747,12 @@ const Engine = (() => {
     { key: 'low', label: '하단', b: -0.5 }
   ];
   const ES = [-3, -2, -1, 0, 1, 2, 3];
+  // 미스큐 한계: 당점 중심에서 반지름의 62%까지 (±3팁+상단/하단은 넘어감)
+  const TIPMAX = 0.62;
+  const tipOK = (E, vk) => Math.hypot(E * P.tip, VERT[vk].b) <= TIPMAX + 1e-9;
+  const CUSHFIRST = 0.75; // 공보다 쿠션을 먼저 맞히는 길 감점(쿠션 하나마다)
+  // 쿠션 끝에서 레일 위 다이아몬드 줄까지(m). 앱 drawTable의 (RAILV + CUSH) / 2 + 0.005와 같게
+  const DIA = 0.096;
   const MAXD = 22;
   // 레일: 0 아래(y=R) 1 오른쪽(x=W-R) 2 위(y=H-R) 3 왼쪽(x=R). 안쪽 법선
   const RN = [[0, 1], [-1, 0], [0, -1], [1, 0]];
@@ -761,7 +767,8 @@ const Engine = (() => {
       objs: [toM(o.objs[0]), toM(o.objs[1])],
       spinGain: o.spinGain || 1,
       a: o.decel || 0.15,
-      vmin: o.vmin || 0.5
+      vmin: o.vmin || 0.5,
+      eC: o.eC || P.eC
     };
   }
 
@@ -803,6 +810,8 @@ const Engine = (() => {
         if (s < best) { best = s; kind = 2; bi = i; }
       }
       if (best === Infinity) return out(false, 'none');
+      // 수구가 붙은(거의 붙은) 쿠션으로는 칠 수 없음
+      if (it === 0 && kind === 1 && best < 0.004) return out(false, 'frozen');
       if (best < 0) best = 0;
       if (useV) {
         const need = 2 * a * best;
@@ -824,17 +833,18 @@ const Engine = (() => {
         const vn = vx * nx + vy * ny;
         const vt = vx * tx + vy * ty;
         const slip = vt - S;
-        const lim = P.muC * (1 + P.eC) * Math.abs(vn);
+        const lim = P.muC * (1 + C.eC) * Math.abs(vn);
         let dvt = Math.min(lim, (2 / 7) * Math.abs(slip));
         if (slip > 0) dvt = -dvt;
         const vt2 = vt + dvt;
+        const run = vt * S > 0; // 순회전: 회전이 진행 방향과 같음
         S -= 2.5 * dvt;
-        const vn2 = -P.eC * vn;
+        const vn2 = -C.eC * vn;
         vx = vn2 * nx + vt2 * tx; vy = vn2 * ny + vt2 * ty;
         const r = Math.hypot(vx, vy) / sp;
         cush++;
         sig = sig * 7 + rail + 1;
-        if (rec) { ratios.push(r); evs.push({ type: 'c', rail, x: px, y: py, n: cush }); }
+        if (rec) { ratios.push(r); evs.push({ type: 'c', rail, x: px, y: py, n: cush, run }); }
         if (useV) V *= r;
       } else {
         const b = objs[bi];
@@ -947,7 +957,7 @@ const Engine = (() => {
       if (len < best || V2 <= 0) { segs.push({ len, dx: ux, dy: uy, ratioAfter: 1 }); break; }
       const nx = RN[rail][0], ny = RN[rail][1];
       const vn = ux * nx + uy * ny, vt = ux * -ny + uy * nx;
-      const vn2 = -P.eC * vn, vt2 = vt * 0.9;
+      const vn2 = -C.eC * vn, vt2 = vt * 0.9;
       const nux = vn2 * nx + vt2 * -ny, nuy = vn2 * ny + vt2 * nx;
       const r = Math.hypot(nux, nuy);
       segs.push({ len, dx: ux, dy: uy, ratioAfter: r });
@@ -1011,6 +1021,7 @@ const Engine = (() => {
     const nE = ES.length, nV = VERT.length;
     const grid = new Float64Array(nE * nV * N);
     for (let ei = 0; ei < nE; ei++) for (let vk = 0; vk < nV; vk++) {
+      if (!tipOK(ES[ei], vk)) continue; // 미스큐 당점은 0으로 둠
       const base = (ei * nV + vk) * N;
       for (let i = 0; i < N; i++) grid[base + i] = sim(C, i * step, ES[ei], vk, false);
     }
@@ -1048,13 +1059,16 @@ const Engine = (() => {
       const width = r.len * step * 180 / Math.PI;
       const d1 = rec.segLens[0];
       const tolMM = d1 * Math.tan(r.len * step / 2) * 1000;
+      if (tolMM < 1) continue;
+      // 쉬움 정도: 각도 폭과 허용 오차(배지와 같은 14mm 척도) 중 작은 쪽
+      const ease = Math.min(width / 1.2, tolMM / 14);
       let spinOK = 0;
       for (const de of [-1, 1]) {
         const ei2 = r.ei + de;
         if (ei2 < 0 || ei2 >= nE) continue;
         if (grid[(ei2 * nV + r.vk) * N + ((r.start + Math.floor((r.len - 1) / 2)) % N)] === r.sig) spinOK++;
       }
-      let score = width * (1 + 0.3 * spinOK);
+      let score = ease * (1 + 0.3 * spinOK);
       if (pw.lv === 5) score *= 0.6; else if (pw.lv === 4) score *= 0.85;
       if (risk.kiss) score *= 0.45;
       if (risk.objHit) score *= 0.6;
@@ -1062,7 +1076,9 @@ const Engine = (() => {
       if (Math.abs(E) === 3) score *= 0.9;
       if (VERT[r.vk].key === 'low' && rec.contact && rec.evs.findIndex(e => e.type === 'b') === 0 && d1 > 1.0) score *= 0.75;
       if (rec.cushions > 4) score *= Math.pow(0.88, rec.cushions - 4);
-      evald.push({ rec, E, vk: r.vk, theta: th, width, tolMM, V0, pw, risk, spinOK, score, sig: r.sig });
+      const bi0 = rec.evs.findIndex(e => e.type === 'b');
+      if (bi0 > 0) score *= Math.pow(CUSHFIRST, bi0);
+      evald.push({ rec, E, vk: r.vk, theta: th, width, tolMM, ease, V0, pw, risk, spinOK, score, sig: r.sig });
     }
     const bestBySig = new Map();
     for (const e of evald) { const b = bestBySig.get(e.sig); if (!b || e.score > b.score) bestBySig.set(e.sig, e); }
@@ -1081,16 +1097,30 @@ const Engine = (() => {
     return rail < 0 ? null : { rail, x: px + ux * best, y: py + uy * best };
   }
 
-  // 이 자리 시스템 표: 장쿠션의 반 포인트마다 겨냥했을 때 3쿠션이 닿는 곳
+  // 같은 선이 레일 위 다이아몬드 줄(쿠션 끝에서 DIA 바깥)과 처음 만나는 곳.
+  // 코너 근처에서는 쿠션에 닿는 레일과 다를 수 있어 rail을 따로 정함. 좌표는 천 안으로 잘라 railPoint에 그대로 씀
+  function diamondHit(C, theta) {
+    const ux = Math.cos(theta), uy = Math.sin(theta), px = C.cue.x, py = C.cue.y;
+    let best = Infinity, rail = -1;
+    if (uy < -1e-12) { const s = (-DIA - py) / uy; if (s < best) { best = s; rail = 0; } }
+    if (ux > 1e-12) { const s = (C.W + DIA - px) / ux; if (s < best) { best = s; rail = 1; } }
+    if (uy > 1e-12) { const s = (C.H + DIA - py) / uy; if (s < best) { best = s; rail = 2; } }
+    if (ux < -1e-12) { const s = (-DIA - px) / ux; if (s < best) { best = s; rail = 3; } }
+    if (rail < 0) return null;
+    const cl = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    return { rail, x: cl(px + ux * best, 0, C.W), y: cl(py + uy * best, 0, C.H) };
+  }
+
+  // 이 자리 시스템 표: 장쿠션 다이아몬드의 반 포인트마다 겨냥했을 때 3쿠션이 닿는 곳
   // rail: 2 = 화면 위 장쿠션, 0 = 화면 아래 장쿠션. 포인트는 화면 왼쪽 0 → 오른쪽 8
   function sysTable(o, opt = {}) {
     const base = makeCtx(o);
     const C = Object.assign({}, base, { objs: [{ x: -50, y: -50 }, { x: -60, y: -60 }] });
     const rail = opt.rail === 0 ? 0 : 2, E = opt.E == null ? 2 : opt.E, vk = opt.vk == null ? 0 : opt.vk;
-    const ty = rail === 2 ? C.H - R : R;
+    const ty = rail === 2 ? C.H + DIA : -DIA; // 다이아몬드 줄을 겨냥
     const rows = [];
     for (let k = 0; k <= 16; k++) {
-      const tx = Math.min(C.W - R, Math.max(R, k * C.W / 16));
+      const tx = k * C.W / 16;
       const th = Math.atan2(ty - C.cue.y, tx - C.cue.x);
       // auto: 1쿠션 뒤 진행 방향으로 도는 순회전 (오른쪽 당점 = 위 장쿠션에서 오른쪽으로 밀어 줌)
       const dir = tx >= C.cue.x ? 1 : -1;
@@ -1103,13 +1133,16 @@ const Engine = (() => {
         aim: k / 2, theta: th, ok, E: Er,
         third: ok ? { rail: cs[2].rail, pt: pt(cs[2]) } : null,
         fourth: cs.length >= 4 ? { rail: cs[3].rail, pt: pt(cs[3]) } : null,
+        contact: cs[0] ? pt(cs[0]) : null, // 1쿠션에 실제로 닿는 포인트
+        shape: cs.slice(0, 3).map(e => e.rail % 2 ? '단' : '장').join('-'),
+        why: ok ? null : (rec.reason === 'frozen' ? 'frozen' : (cs[0] && cs[0].rail !== rail ? 'side' : 'stop')),
         path: rec.path.slice(0, 5)
       });
     }
     return rows;
   }
 
-  return { R, TABLES, P, VERT, ES, makeCtx, sim, solve, needSpeed, powerLevel, POWER, LEVEL_SPEED, riskCheck, decodeSig, objectPath, timeline, posAt, railHit, sysTable };
+  return { R, TABLES, P, VERT, ES, TIPMAX, tipOK, DIA, makeCtx, sim, solve, needSpeed, powerLevel, POWER, LEVEL_SPEED, riskCheck, decodeSig, objectPath, timeline, posAt, railHit, diamondHit, sysTable };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
 
@@ -1772,7 +1805,7 @@ if (typeof module !== 'undefined') module.exports = Core;
       // 천 결: 아주 옅은 잡티 무늬
       g.save(); g.globalAlpha = 0.07; g.fillStyle = feltPattern(g); g.fillRect(TX(0), TY(0), t.W * s, t.H * s); g.restore();
     }
-    // 다이아몬드
+    // 다이아몬드 (mid는 Engine.DIA와 같은 값이어야 겨냥 숫자와 그림이 맞음)
     const pearl = css('--pearl'), mid = (RAILV + CUSH) / 2 + 0.005;
     g.fillStyle = pearl;
     const dia = (x, y) => { const z = Math.max(2.2, 0.012 * s); g.beginPath(); g.moveTo(x, y - z); g.lineTo(x + z * 0.7, y); g.lineTo(x, y + z); g.lineTo(x - z * 0.7, y); g.closePath(); g.fill(); };
