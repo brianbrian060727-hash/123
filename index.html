@@ -254,6 +254,8 @@ select.text-in { flex: 0 1 260px; min-height: 40px; }
 .sc-p.win { border-color: var(--good); }
 .badge { font-size: 11px; font-weight: 700; line-height: 1.5; align-self: center; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
 .badge.good { background: var(--good); color: #fff; }
+.badge.soft { background: var(--accent-soft); color: var(--ink); }
+#scFoul { color: var(--bad); }
 .pl-list { display: grid; gap: 8px; }
 .pl-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) 84px; gap: 8px; align-items: center; }
 .pl-row .idx { font-family: var(--f-num); color: var(--muted); font-size: 13px; text-align: center; }
@@ -657,6 +659,8 @@ details.settings { box-shadow: var(--shadow); }
       <div class="panel-head"><h2>경기 설정</h2><span class="sub">1명은 혼자 연습, 2~6명은 개인전</span></div>
       <div class="set-row"><label>종목</label>
         <div class="seg" id="scType"><button type="button" data-v="3c">3쿠션</button><button type="button" data-v="4b">4구 (1득점 10점)</button></div></div>
+      <div class="set-row chk sc-4b" hidden><label for="scOptFin">마무리 3쿠션<span class="sub">목표 점수 뒤 3쿠션으로 끝내기</span></label><input type="checkbox" id="scOptFin"></div>
+      <div class="set-row chk sc-4b" hidden><label for="scOptFoul">파울 −10 버튼<span class="sub">파울이면 10점을 빼고 차례를 넘겨요</span></label><input type="checkbox" id="scOptFoul"></div>
       <div class="set-row"><label>인원</label>
         <div class="stepper"><button type="button" class="mini" id="scMinus" aria-label="인원 줄이기">−</button><b id="scCount">2</b><button type="button" class="mini" id="scPlus" aria-label="인원 늘리기">+</button></div></div>
       <div class="pl-head" aria-hidden="true"><span>이름</span><span>목표 점수(핸디)</span></div>
@@ -696,6 +700,7 @@ details.settings { box-shadow: var(--shadow); }
       </div>
       <div class="row-inline">
         <button type="button" class="btn sm" id="scUndo">되돌리기</button>
+        <button type="button" class="btn sm" id="scFoul" hidden>파울 −10</button>
         <button type="button" class="btn sm" id="scBig">큰 화면</button>
         <button type="button" class="btn sm" id="scCopy">결과 복사</button>
         <button type="button" class="btn sm primary" id="scAgain" hidden>같은 설정으로 한 판 더</button>
@@ -1514,6 +1519,8 @@ const Core = (() => {
     if (!ps.length) throw new Error('players');
     const step = Math.max(1, Math.round(+opts.step) || 1);
     const g = { players: ps, turn: 0, round: 1, run: 0, step, limit: Math.max(0, Math.round(+opts.limit) || 0), team: !!opts.team, closing: false, done: false, reason: '' };
+    // 4구 하우스 룰(옵션): 목표 점수 뒤 3쿠션으로 마무리, 파울 −10
+    g.finish3c = !!opts.finish3c && g.step > 1; g.foulOn = !!opts.foul && g.step > 1;
     startTurn(g, 0);
     return g;
   }
@@ -1535,15 +1542,30 @@ const Core = (() => {
     // 4구: 목표를 넘는 몫은 기록·연속·하이런에도 넣지 않음
     const d = Math.min(g.step || 1, p.target - p.score);
     p.score += d; p.log[p.log.length - 1] += d; g.run += d; p.high = Math.max(p.high, g.run);
+    // 마무리 3쿠션: 목표에 처음 닿으면 차례를 이어 마무리 샷을 침. 마무리 상태의 득점이 마무리 성공
+    if (g.finish3c && !p.fin) { if (p.score >= p.target) p.fin = true; return g; }
+    if (g.finish3c) { p.fin = false; p.made = true; }
     if (p.score >= p.target) { g.closing = true; endTurn(g); }
     return g;
   }
   function miss(g) { if (!g.done) endTurn(g); return g; }
+  // 파울: step만큼 깎고(0 아래로는 안 감) 차례를 넘김. 기록에는 실제로 깎인 만큼
+  function foul(g) {
+    if (g.done) return g;
+    const p = g.players[g.turn], before = p.score;
+    p.score = Math.max(0, p.score - (g.step || 1));
+    p.log[p.log.length - 1] += p.score - before;
+    if (p.score < p.target) p.fin = false;
+    endTurn(g);
+    return g;
+  }
+  // 목표 달성: 마무리 3쿠션 경기는 마무리까지 성공해야 함
+  const reached = (g, p) => p.score >= p.target && (!g.finish3c || !!p.made);
   const avg = p => p.inn > 0 ? p.score / p.inn : 0;
   const shooter = p => (p.members && p.members.length) ? p.members[(Math.max(1, p.inn) - 1) % p.members.length] : p.name;
   // 순위: 목표 달성 여부 → 달성률(핸디 공정) → 목표 대비 에버리지
   function standings(g) {
-    return g.players.map((p, i) => ({ i, p, reached: p.score >= p.target, ratio: p.score / p.target, avg: avg(p) }))
+    return g.players.map((p, i) => ({ i, p, reached: reached(g, p), ratio: p.score / p.target, avg: avg(p) }))
       .sort((a, b) => (b.reached - a.reached) || (b.ratio - a.ratio) || (b.avg / b.p.target - a.avg / a.p.target));
   }
   function result(g) {
@@ -1552,13 +1574,13 @@ const Core = (() => {
     if (g.players.length === 1) {
       const p = g.players[0];
       const a = avg(p).toFixed(g.step > 1 ? 1 : 3); // 4구(10점 단위)는 소수 한 자리
-      return p.score >= p.target ? `목표 ${p.target}점 달성 · ${p.inn}이닝 · 에버 ${a}` : `${p.inn}이닝 동안 ${p.score}점 · 에버 ${a}`;
+      return reached(g, p) ? `목표 ${p.target}점 달성 · ${p.inn}이닝 · 에버 ${a}` : `${p.inn}이닝 동안 ${p.score}점${p.fin ? ' (마무리 전)' : ''} · 에버 ${a}`;
     }
     // 함께 목표에 닿았거나, 아무도 못 닿았는데 달성률이 같으면 무승부 (핸디 경기에서 점수만 많다고 이기지 않음)
     const top = st.filter(s => s.reached === st[0].reached && Math.abs(s.ratio - st[0].ratio) < 1e-9);
     return top.length > 1 ? `무승부 (${top.map(s => s.p.name).join(', ')})` : `${st[0].p.name} 승`;
   }
-  return { encodeLayout, decodeLayout, routeName, score: { create, hit, miss, avg, shooter, standings, result } };
+  return { encodeLayout, decodeLayout, routeName, score: { create, hit, miss, foul, avg, shooter, standings, result } };
 })();
 if (typeof module !== 'undefined') module.exports = Core;
 </script>
@@ -3242,14 +3264,18 @@ if (typeof module !== 'undefined') module.exports = Core;
     if (!r || typeof r !== 'object' || !Array.isArray(r.n) || !r.n.length) return null;
     const d = N(r.d); if (!(d > 0) || d > Date.now() + 864e5) return null;
     const k = Math.min(r.n.length, 6), A = a => Array.from({ length: k }, (_, j) => N(Array.isArray(a) ? a[j] : 0));
-    return { id: typeof r.id === 'string' && /^[A-Za-z0-9_-]{1,60}$/.test(r.id) ? r.id : '', d, k: r.k === '4b' ? '4b' : '3c', n: r.n.slice(0, k).map(x => S(x, 24)),
+    const o = { id: typeof r.id === 'string' && /^[A-Za-z0-9_-]{1,60}$/.test(r.id) ? r.id : '', d, k: r.k === '4b' ? '4b' : '3c', n: r.n.slice(0, k).map(x => S(x, 24)),
       t: A(r.t), s: A(r.s), i: A(r.i), h: A(r.h), res: S(r.res, 80), by: r.by ? S(r.by, 80) : undefined };
+    // 4구 하우스 룰(마무리 3쿠션 · 파울)을 쓴 경기만 표시를 남김
+    const x = r.r && typeof r.r === 'object' ? r.r : null;
+    if (o.k === '4b' && x && (x.fin === true || x.foul === true)) o.r = { fin: x.fin === true, foul: x.foul === true };
+    return o;
   }
   const fmtDay = d => { const x = new Date(d); return `${x.getMonth() + 1}/${x.getDate()}`; };
   const av3 = (sc, inn) => inn > 0 ? (sc / inn).toFixed(3) : '0.000';
   function histHtml(a, empty) {
     return a.length ? `<table class="list"><tr><th>날짜</th><th>선수 · 점수</th><th class="r">이닝</th><th>결과</th></tr>${a.slice(0, 20).map(r =>
-      `<tr><td>${esc(fmtDay(r.d))}</td><td>${r.k === '4b' ? '<span class="sub">4구</span> ' : ''}${r.n.map((n, i) => `${esc(n)} <span class="num">${esc(r.s[i])}/${esc(r.t[i])}</span>`).join(' · ')}</td><td class="r num">${esc(r.i.length ? Math.max(...r.i) : 0)}</td><td>${esc(r.res)}</td></tr>`).join('')}</table>`
+      `<tr><td>${esc(fmtDay(r.d))}</td><td>${r.k === '4b' ? `<span class="sub">4구${r.r && r.r.fin ? '·마무리' : ''}</span> ` : ''}${r.n.map((n, i) => `${esc(n)} <span class="num">${esc(r.s[i])}/${esc(r.t[i])}</span>`).join(' · ')}</td><td class="r num">${esc(r.i.length ? Math.max(...r.i) : 0)}</td><td>${esc(r.res)}</td></tr>`).join('')}</table>`
       : `<p class="sub" style="margin:0">${empty}</p>`;
   }
   // 기본 이름(선수 A…)은 사람이 아니라서 선수별 줄과 상대 전적에서 뺌
@@ -3286,7 +3312,7 @@ if (typeof module !== 'undefined') module.exports = Core;
   const Score = (() => {
     const SC = Core.score;
     const KEY = 'cue3-score2', HKEY = 'cue3-history';
-    let cfg = { players: [{ name: '선수 A', target: 20 }, { name: '선수 B', target: 20 }], limit: 0, clock: '0', voice: false, team: false, type: '3c' };
+    let cfg = { players: [{ name: '선수 A', target: 20 }, { name: '선수 B', target: 20 }], limit: 0, clock: '0', voice: false, team: false, type: '3c', finish3c: false, foul: false };
     const DEF = { '3c': 20, '4b': 200 };
     // 선수 명단: 이름과 종목별 점수(핸디)
     const RKEY = 'cue3-roster';
@@ -3301,6 +3327,7 @@ if (typeof module !== 'undefined') module.exports = Core;
         cfg = Object.assign(cfg, v.cfg);
         // 저장값이 망가져도 입력 칸 속성 밖으로 새지 않게 이름·점수를 다시 정리
         cfg.type = cfg.type === '4b' ? '4b' : '3c';
+        cfg.finish3c = cfg.finish3c === true; cfg.foul = cfg.foul === true;
         cfg.players = cfg.players.slice(0, 6).map(p => ({ name: S(p && p.name, 24), target: parseInt(p && p.target, 10) || DEF[cfg.type] }));
       }
       if (v && v.g && Array.isArray(v.g.players)) {
@@ -3435,6 +3462,9 @@ if (typeof module !== 'undefined') module.exports = Core;
     // 설정 화면
     function renderSetup() {
       [...$('#scType').children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === cfg.type)));
+      // 4구 하우스 룰은 4구일 때만
+      document.querySelectorAll('#scSetup .sc-4b').forEach(el => { el.hidden = cfg.type !== '4b'; });
+      $('#scOptFin').checked = !!cfg.finish3c; $('#scOptFoul').checked = !!cfg.foul;
       const ro = roster();
       $('#rosterNames').innerHTML = ro.map(r => `<option value="${esc(r.name)}"></option>`).join('');
       $('#scRosterCount').textContent = ro.length ? `${ro.length}명` : '';
@@ -3492,6 +3522,8 @@ if (typeof module !== 'undefined') module.exports = Core;
     });
     $('#scLimit').addEventListener('input', e => { cfg.limit = Math.max(0, Math.min(99, parseInt(e.target.value, 10) || 0)); save(); });
     $('#scLive').addEventListener('change', e => { cfg.live = e.target.checked; save(); });
+    $('#scOptFin').addEventListener('change', e => { cfg.finish3c = e.target.checked; save(); });
+    $('#scOptFoul').addEventListener('change', e => { cfg.foul = e.target.checked; save(); });
     $('#scTeam').addEventListener('change', e => {
       cfg.team = e.target.checked;
       if (cfg.team && cfg.players.length < 2) cfg.players.push({ name: '선수 B', target: cfg.players[0].target });
@@ -3507,7 +3539,8 @@ if (typeof module !== 'undefined') module.exports = Core;
     $('#scStart').addEventListener('click', () => {
       unlockAudio();
       learn = -1; learnStep();
-      g = SC.create(cfg.players, { limit: cfg.limit, team: cfg.team, step: cfg.type === '4b' ? 10 : 1 }); g.kind = cfg.type; g.ext = []; undo = []; clk.hold = null;
+      const is4 = cfg.type === '4b';
+      g = SC.create(cfg.players, { limit: cfg.limit, team: cfg.team, step: is4 ? 10 : 1, finish3c: is4 && cfg.finish3c, foul: is4 && cfg.foul }); g.kind = cfg.type; g.ext = []; undo = []; clk.hold = null;
       g.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
       msg(''); keepAwake(true); render(); clockReset();
       $('#scGame').scrollIntoView({ block: 'start' });
@@ -3520,8 +3553,8 @@ if (typeof module !== 'undefined') module.exports = Core;
       if (g.done) return onDone();
       if (g.turn !== prevTurn) {
         const p = g.players[g.turn];
-        say(`${who(g.turn)} 차례, ${p.score}점`);
-        if (g.closing) msg(`목표 도달! 같은 이닝을 끝까지 돌려요. ${who(g.turn)} 차례.`);
+        say(`${who(g.turn)} 차례, ${p.fin ? '마무리' : `${p.score}점`}`);
+        if (g.closing) msg(`${g.finish3c ? '마무리 성공!' : '목표 도달!'} 같은 이닝을 끝까지 돌려요. ${who(g.turn)} 차례.`);
       }
       render(); clockReset();
       if (document.body.classList.contains('focus')) { const c = $('#scBoard .sc-p.on'); if (c) c.scrollIntoView({ block: 'nearest' }); }
@@ -3532,7 +3565,8 @@ if (typeof module !== 'undefined') module.exports = Core;
       const a = hist();
       // 되돌리기에서 이 경기를 찾을 수 있게 id를 경기에도 남김
       if (!g.id) g.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-      const rec = { id: g.id, d: Date.now(), k: g.kind || '3c', n: g.players.map(p => p.name), t: g.players.map(p => p.target), s: g.players.map(p => p.score), i: g.players.map(p => p.inn), h: g.players.map(p => p.high), res };
+      const rec = { id: g.id, d: Date.now(), k: g.kind || '3c', n: g.players.map(p => p.name), t: g.players.map(p => p.target), s: g.players.map(p => p.score), i: g.players.map(p => p.inn), h: g.players.map(p => p.high), res,
+        r: { fin: !!g.finish3c, foul: !!g.foulOn } };
       a.unshift(rec);
       if (hooks.onDone) hooks.onDone(rec);
       try { localStorage.setItem(HKEY, JSON.stringify(a.slice(0, HMAX))); } catch (e) { /* 무시 */ }
@@ -3540,9 +3574,24 @@ if (typeof module !== 'undefined') module.exports = Core;
     }
     $('#scHit').addEventListener('click', () => {
       if (!g || g.done) return; snap(); buzz(18);
-      const prev = g.turn; SC.hit(g);
-      if (g.turn === prev && !g.done) { const p = g.players[prev]; say(`${p.score}`); render(); clockReset(); }
+      const prev = g.turn, fin = !!g.players[prev].fin; SC.hit(g);
+      if (g.turn === prev && !g.done) { const p = g.players[prev]; say(p.fin && !fin ? `${p.score}, 마무리 3쿠션` : `${p.score}`); render(); clockReset(); }
       else afterMove(prev);
+    });
+    // 파울: 새 경기처럼 두 번 눌러야 적용(3초 안에)
+    let foulT = 0;
+    const foulReset = () => { clearTimeout(foulT); const b = $('#scFoul'); delete b.dataset.armed; b.textContent = `파울 −${(g && g.step) || 10}`; };
+    $('#scFoul').addEventListener('click', e => {
+      const b = e.currentTarget;
+      if (!g || g.done || !g.foulOn) return;
+      if (!b.dataset.armed) {
+        b.dataset.armed = '1'; b.textContent = `한 번 더 누르면 −${g.step}`;
+        clearTimeout(foulT); foulT = setTimeout(foulReset, 3000);
+        return;
+      }
+      foulReset();
+      snap(); const prev = g.turn, nm = who(prev);
+      SC.foul(g); toast(`${nm} 파울 −${g.step}`, 'info'); afterMove(prev);
     });
     $('#scMiss').addEventListener('click', () => { if (!g || g.done) return; snap(); const prev = g.turn; SC.miss(g); afterMove(prev); });
     $('#scUndo').addEventListener('click', () => {
@@ -3613,9 +3662,9 @@ if (typeof module !== 'undefined') module.exports = Core;
       const st = g.done ? SC.standings(g) : null;
       $('#scBoard').innerHTML = g.players.map((p, i) => {
         // 혼자 연습은 목표를 채웠을 때만 '달성'
-        const on = i === g.turn && !g.done, won = g.done && (solo ? p.score >= p.target : st[0].i === i && !/무승부/.test(SC.result(g)));
+        const on = i === g.turn && !g.done, won = g.done && (solo ? st[0].reached : st[0].i === i && !/무승부/.test(SC.result(g)));
         return `<div class="sc-p${on ? ' on' : ''}${won ? ' win' : ''}">
-          <div class="pname"><span>${esc(p.name)}</span>${on ? '<span class="badge">차례</span>' : won ? `<span class="badge good">${solo ? '달성' : '승'}</span>` : ''}</div>
+          <div class="pname"><span>${esc(p.name)}</span>${on ? `<span class="badge">${p.fin ? '마무리 차례' : '차례'}</span>` : won ? `<span class="badge good">${solo ? '달성' : '승'}</span>` : p.fin && !g.done ? '<span class="badge soft">마무리</span>' : ''}</div>
           ${g.team && on ? `<div class="sub">칠 사람: <b>${esc(SC.shooter(p))}</b></div>` : ''}
           <div class="sc-score"><b>${p.score}</b><span class="tgt">/ ${p.target}</span></div>
           <div class="sc-bar"><i style="width:${Math.min(100, p.score / p.target * 100)}%"></i></div>
@@ -3627,9 +3676,12 @@ if (typeof module !== 'undefined') module.exports = Core;
       g.players.forEach((p, i) => { if (prevScores[i] != null && p.score > prevScores[i] && bs[i]) { bs[i].classList.add('bump'); cards[i].classList.add('flash'); } });
       prevScores = g.players.map(p => p.score);
       $('#scHit').disabled = $('#scMiss').disabled = g.done;
-      $('#scMiss').textContent = solo ? '공타 · 다음 이닝' : '공타 · 차례 넘기기';
-      $('#scHit').textContent = `+${g.step || 1} 득점`;
-      $('#scNoteStep').textContent = `득점하면 +${g.step || 1}, 못 맞히면 공타.`;
+      // 마무리 3쿠션 차례면 버튼 뜻이 바뀜
+      const fin = !g.done && !!cur.fin;
+      $('#scMiss').textContent = fin ? (solo ? '마무리 실패 · 다음 이닝' : '마무리 실패 · 차례 넘기기') : solo ? '공타 · 다음 이닝' : '공타 · 차례 넘기기';
+      $('#scHit').textContent = fin ? '마무리 3쿠션 성공' : `+${g.step || 1} 득점`;
+      $('#scFoul').hidden = !g.foulOn || !!g.done; foulReset();
+      $('#scNoteStep').textContent = `득점하면 +${g.step || 1}, 못 맞히면 공타.${g.finish3c ? ' 목표 점수에 닿으면 3쿠션으로 마무리해야 끝나요.' : ''}${g.foulOn ? ` 파울은 −${g.step} (두 번 눌러요).` : ''}`;
       $('#scUndo').disabled = !undo.length;
       $('#scGame').classList.toggle('done', !!g.done);
       $('#scAgain').hidden = !g.done; $('#scSwap').hidden = !g.done || solo;

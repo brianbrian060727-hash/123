@@ -1263,3 +1263,71 @@ test('E2E 69: 우리 테이블 맞추기 — 아래 장쿠션을 누르면 회�
   assert.match(await p.textContent('#status'), /우리당구장 3번대/);
   noErr(p); await p.context().close();
 });
+test('E2E 70: 4구 하우스 룰 — 4구에서만 보이는 옵션, 마무리 3쿠션 버튼, 두 번 눌러야 하는 파울 −10, 기록에 룰 표시', async () => {
+  const p = await open({ hash: '#score', noWait: true, w: 360 });
+  // 3쿠션에서는 숨김, 기본은 꺼짐
+  assert.equal(await p.isVisible('#scOptFin'), false); assert.equal(await p.isVisible('#scOptFoul'), false);
+  await p.click('#scType [data-v="4b"]');
+  assert.equal(await p.isVisible('#scOptFin'), true); assert.equal(await p.isVisible('#scOptFoul'), true);
+  assert.equal(await p.isChecked('#scOptFin'), false); assert.equal(await p.isChecked('#scOptFoul'), false);
+  await p.check('#scOptFin'); await p.check('#scOptFoul');
+  // 새로 열어도 옵션이 남음
+  await p.reload(); await p.waitForSelector('#scSetup:not([hidden])');
+  assert.equal(await p.isChecked('#scOptFin'), true); assert.equal(await p.isChecked('#scOptFoul'), true);
+  await p.fill('#scPlayers input[data-i="0"][data-k="name"]', '철수'); await p.fill('#scPlayers input[data-i="1"][data-k="name"]', '영희');
+  const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('20'); await t[1].fill('20');
+  await p.click('#scStart');
+  assert.match(await p.textContent('#scNote'), /3쿠션으로 마무리/);
+  assert.equal(await p.isVisible('#scFoul'), true);
+  const scores = () => p.$$eval('.sc-score b', e => e.map(x => x.textContent));
+  // 철수: 목표 점수에 닿으면 차례가 이어지고 버튼이 마무리로 바뀜
+  await p.click('#scHit'); await p.click('#scHit');
+  assert.deepEqual(await scores(), ['20', '0']);
+  assert.equal(await p.textContent('#scHit'), '마무리 3쿠션 성공');
+  assert.equal(await p.textContent('#scMiss'), '마무리 실패 · 차례 넘기기');
+  assert.equal(await p.textContent('#scBoard .sc-p.on .badge'), '마무리 차례');
+  await p.click('#scMiss');
+  assert.equal(await p.textContent('#scHit'), '+10 득점');
+  assert.equal(await p.textContent('#scBoard .badge.soft'), '마무리');
+  // 영희: 득점 뒤 파울은 한 번 누르면 확인만, 두 번째에 −10하고 차례 넘김
+  await p.click('#scHit');
+  await p.click('#scFoul');
+  assert.equal(await p.textContent('#scFoul'), '한 번 더 누르면 −10');
+  assert.deepEqual(await scores(), ['20', '10']);
+  await p.click('#scFoul');
+  assert.deepEqual(await scores(), ['20', '0']);
+  assert.equal(await p.textContent('#scFoul'), '파울 −10');
+  assert.match(await p.textContent('#scInfo'), /2이닝 · 철수 차례/);
+  // 되돌리기로 파울 취소
+  await p.click('#scUndo');
+  assert.deepEqual(await scores(), ['20', '10']);
+  assert.match(await p.textContent('#scInfo'), /영희 차례/);
+  // 확인 중에 다른 버튼을 누르면 파울 확인은 풀림
+  await p.click('#scFoul'); await p.click('#scMiss');
+  assert.equal(await p.textContent('#scFoul'), '파울 −10');
+  await p.click('#scFoul');
+  assert.deepEqual(await scores(), ['20', '10']);
+  await p.click('#scFoul'); assert.deepEqual(await scores(), ['10', '10']);
+  // 철수 차례가 영희에게 넘어감 → 영희 공타 → 철수 득점 두 번 → 마무리 성공
+  await p.click('#scMiss');
+  await p.click('#scHit'); assert.equal(await p.textContent('#scHit'), '마무리 3쿠션 성공');
+  await p.click('#scHit');
+  assert.match(await p.textContent('#scMsg'), /마무리 성공! 같은 이닝을 끝까지/);
+  await p.click('#scMiss');
+  assert.match(await p.textContent('#scMsg'), /경기 끝 · 철수 승/);
+  assert.equal(await p.isVisible('#scFoul'), false);
+  const rec = JSON.parse(await p.evaluate(() => localStorage.getItem('cue3-history')))[0];
+  assert.deepEqual(rec.r, { fin: true, foul: true });
+  assert.match(await p.textContent('#scHist'), /4구·마무리/);
+  // 다시 읽어도 룰 표시가 남음(정리 함수가 버리지 않음)
+  await p.reload(); await p.waitForSelector('#scHist table');
+  assert.match(await p.textContent('#scHist'), /4구·마무리/);
+  // 3쿠션으로 돌아가면 옵션은 숨고, 경기에도 들어가지 않음
+  await p.click('#scNew');
+  await p.click('#scType [data-v="3c"]');
+  assert.equal(await p.isVisible('#scOptFin'), false);
+  await p.click('#scStart');
+  assert.equal(await p.isVisible('#scFoul'), false);
+  assert.equal(await p.textContent('#scHit'), '+1 득점');
+  noErr(p); await p.context().close();
+});

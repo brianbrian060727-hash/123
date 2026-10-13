@@ -308,6 +308,65 @@ test('4구: 목표를 넘는 득점은 기록·하이런에 넣지 않음', () =
 test('4구: 목표 범위 5000까지', () => { const g = SC.create([{ name: 'a', target: 3000 }], { step: 10 }); assert.equal(g.players[0].target, 3000); });
 test('4구: 혼자 연습 결과 문구의 에버는 소수 한 자리', () => { const g = play(SC.create([{ name: 'a', target: 20 }], { step: 10 }), 'hmh'); assert.match(SC.result(g), /목표 20점 달성 · 2이닝 · 에버 10\.0$/); });
 
+// ---------- 4구 하우스 룰: 마무리 3쿠션 · 파울 ----------
+const play4 = (g, s) => { for (const c of s) c === 'h' ? SC.hit(g) : c === 'f' ? SC.foul(g) : SC.miss(g); return g; };
+test('4구 마무리: 목표에 닿아도 끝나지 않고 차례를 이어 마무리, 한 번 더 득점하면 끝', () => {
+  const g = play4(SC.create([{ name: 'a', target: 30 }], { step: 10, finish3c: true }), 'hhh');
+  const p = g.players[0];
+  assert.ok(!g.done); assert.ok(p.fin); assert.ok(!g.closing); assert.equal(p.score, 30); assert.equal(g.turn, 0);
+  assert.match(SC.result(play4(SC.create([{ name: 'a', target: 30 }], { step: 10, finish3c: true, limit: 1 }), 'hhhm')), /1이닝 동안 30점 \(마무리 전\)/);
+  play4(g, 'h'); assert.ok(g.done); assert.equal(g.reason, 'target'); assert.equal(p.score, 30); assert.equal(p.high, 30);
+  assert.match(SC.result(g), /목표 30점 달성 · 1이닝/);
+});
+test('4구 마무리: 실패하면 차례가 넘어가고, 다음 차례에 성공하면 같은 이닝 규칙', () => {
+  const g = play4(SC.create(P(30, 30), { step: 10, finish3c: true }), 'hhhm');
+  assert.equal(g.turn, 1); assert.ok(g.players[0].fin); assert.ok(!g.closing);
+  play4(g, 'm'); assert.equal(g.turn, 0); assert.equal(g.round, 2);
+  play4(g, 'h'); assert.ok(g.closing); assert.ok(!g.done); assert.equal(g.turn, 1); assert.ok(!g.players[0].fin);
+  play4(g, 'm'); assert.ok(g.done); assert.equal(SC.result(g), 'P0 승');
+});
+test('4구 마무리: 둘 다 목표 점수여도 마무리에 성공한 사람이 승', () => {
+  const g = play4(SC.create(P(10, 10), { step: 10, finish3c: true }), 'hm' + 'hh');
+  assert.ok(g.done); assert.equal(g.players[0].score, 10); assert.ok(g.players[0].fin);
+  assert.equal(SC.result(g), 'P1 승'); assert.equal(SC.standings(g)[0].i, 1);
+});
+test('4구 파울: 20점에서 10점이 되고 차례가 넘어감, 기록 합 = 점수', () => {
+  const g = play4(SC.create(P(30, 30), { step: 10, foul: true }), 'hh');
+  assert.equal(g.players[0].score, 20); assert.equal(g.turn, 0);
+  SC.foul(g);
+  const p = g.players[0];
+  assert.equal(p.score, 10); assert.equal(g.turn, 1); assert.equal(p.log[0], 10); assert.equal(p.high, 20);
+  play4(g, 'f'); assert.equal(g.players[1].score, 0); assert.equal(g.players[1].log[0], 0); assert.equal(g.turn, 0);
+  for (const q of g.players) assert.equal(q.log.reduce((a, b) => a + b, 0), q.score);
+});
+test('4구 파울: 마무리 차례에 파울하면 목표 아래로 내려가 마무리가 풀림', () => {
+  const g = play4(SC.create(P(20, 20), { step: 10, finish3c: true, foul: true }), 'hhf');
+  assert.equal(g.players[0].score, 10); assert.ok(!g.players[0].fin); assert.equal(g.turn, 1);
+  play4(g, 'm' + 'h'); assert.ok(g.players[0].fin); assert.ok(!g.done);
+});
+test('4구 하우스 룰은 3쿠션(1점 단위)에서는 꺼짐, 기본도 꺼짐', () => {
+  const g = SC.create(P(3, 3), { finish3c: true, foul: true });
+  assert.equal(g.finish3c, false); assert.equal(g.foulOn, false);
+  const g4 = SC.create(P(30, 30), { step: 10 });
+  assert.equal(g4.finish3c, false); assert.equal(g4.foulOn, false);
+  play4(g4, 'hhh'); assert.ok(g4.closing); assert.equal(g4.turn, 1);
+});
+test('4구 하우스 룰: 무작위 500경기 규칙 불변식', () => {
+  let s = 7;
+  for (let k = 0; k < 500; k++) {
+    const n = 1 + (k % 6), g = SC.create(Array.from({ length: n }, (_, i) => ({ name: 'p' + i, target: 10 * (1 + ((k + i) % 6)) })), { step: 10, finish3c: k % 3 !== 1, foul: k % 3 !== 2, limit: k % 5 === 0 ? 4 : 0 });
+    for (let i = 0; i < 20000 && !g.done; i++) { s = (s * 1103515245 + 12345) % 2147483648; const r = (s >> 8) % 6; r < 3 ? SC.hit(g) : r < 5 || !g.foulOn ? SC.miss(g) : SC.foul(g); }
+    assert.ok(g.done, 'finished');
+    const inn = g.players.map(p => p.inn);
+    assert.ok(Math.max(...inn) - Math.min(...inn) === 0, `equal innings ${inn}`);
+    for (const p of g.players) {
+      assert.ok(p.score >= 0 && p.score <= p.target);
+      assert.equal(p.log.reduce((a, b) => a + b, 0), p.score); assert.equal(p.log.length, p.inn);
+    }
+    if (g.reason === 'target') assert.ok(g.players.some(p => p.score >= p.target && (!g.finish3c || p.made)));
+  }
+});
+
 test('시스템 표: 순회전은 겨냥 방향에 따라 당점 좌우가 바뀜', () => {
   const rows = Engine.sysTable({ table: 'daedae', cue: { x: 1.4, y: 1.0 }, objs: [{ x: 1, y: 1 }, { x: 2, y: 0.5 }] }, { rail: 2, E: 2, auto: true });
   assert.ok(rows[2].E < 0 && rows[14].E > 0);
