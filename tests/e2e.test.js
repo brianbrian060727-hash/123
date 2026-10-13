@@ -1428,3 +1428,86 @@ test('E2E 73: Claude 공 찾기 — 빈 좌표·가장자리 좌표는 못 찾�
   assert.deepEqual((await codeNums(p)).v, after.v);
   noErr(p); await p.context().close();
 });
+// 대비: 토큰 색 쌍을 실제 계산 값으로 비교 (밝게 · 시스템 어둡게 · 어둡게 고정)
+const CONTRAST = `(() => {
+  const probe = document.createElement('i'); document.body.appendChild(probe);
+  const rgb = v => { probe.style.color = 'var(--' + v + ')'; return getComputedStyle(probe).color.match(/[\\d.]+/g).slice(0, 3).map(Number); };
+  const lum = c => { const [r, g, b] = c.map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+  const ratio = (a, b) => { const x = lum(rgb(a)), y = lum(rgb(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const pairs = [['brass-text', 'surface-2'], ['brass-text', 'surface'], ['warn', 'surface-2'], ['warn', 'surface'], ['good', 'surface'],
+    ['on-warn', 'warn'], ['on-good', 'good'], ['accent-ink', 'good']];
+  const out = {}; for (const [a, b] of pairs) out[a + '/' + b] = +ratio(a, b).toFixed(2);
+  out.line = +ratio('line-strong', 'surface').toFixed(2);
+  probe.remove(); return out;
+})()`;
+test('E2E 74: 접근성 마감 — 탭 화살표 키·ARIA, 이름표 묶음, 글자 대비, 터치 크기, 칩 그림의 내 공', async () => {
+  const p = await open();
+  // 탭: 패널 연결과 roving tabindex
+  for (const [b, s] of [['tabBtnFind', 'tabFind'], ['tabBtnScore', 'tabScore'], ['tabBtnTips', 'tabTips']]) {
+    assert.equal(await p.getAttribute('#' + b, 'aria-controls'), s);
+    assert.equal(await p.getAttribute('#' + s, 'role'), 'tabpanel');
+    assert.equal(await p.getAttribute('#' + s, 'aria-labelledby'), b);
+  }
+  const tabIdx = () => p.$$eval('.tabs button', bs => bs.map(b => b.tabIndex));
+  assert.deepEqual(await tabIdx(), [0, -1, -1]);
+  await p.focus('#tabBtnFind');
+  await p.keyboard.press('ArrowRight');
+  assert.equal(await p.isVisible('#tabScore'), true);
+  assert.equal(await p.evaluate(() => document.activeElement.id), 'tabBtnScore');
+  assert.deepEqual(await tabIdx(), [-1, 0, -1]);
+  await p.keyboard.press('End'); assert.equal(await p.isVisible('#tabTips'), true);
+  await p.keyboard.press('Home'); assert.equal(await p.isVisible('#tabFind'), true);
+  await p.keyboard.press('ArrowLeft'); assert.equal(await p.isVisible('#tabTips'), true, '왼쪽 끝에서 돌아감');
+  assert.equal(await p.evaluate(() => document.activeElement.id), 'tabBtnTips');
+  await p.keyboard.press('Home');
+  // 주인 없는 이름표 없음: label은 모두 컨트롤이 있고, 버튼 묶음은 이름표 글자로 이름이 붙음
+  assert.deepEqual(await p.$$eval('.set-row label', ls => ls.filter(l => !l.control).map(l => l.textContent)), []);
+  const groups = await p.$$eval('.set-row > .seg, .set-row > .stepper', gs => gs.map(g => {
+    const l = document.getElementById(g.getAttribute('aria-labelledby') || '');
+    return { id: g.id, role: g.getAttribute('role'), name: l ? l.textContent.trim() : '' };
+  }));
+  assert.equal(groups.length, 8, JSON.stringify(groups));
+  assert.ok(groups.every(g => g.role === 'group' && g.name.length > 0), JSON.stringify(groups));
+  // 글자 대비 4.5 이상, 입력 칸 테두리 3 이상 (세 테마 블록 모두)
+  const check = async label => {
+    const r = await p.evaluate(CONTRAST);
+    for (const [k, v] of Object.entries(r)) assert.ok(v >= (k === 'line' ? 3 : 4.5), `${label} ${k} ${v}`);
+  };
+  await check('light');
+  await p.emulateMedia({ colorScheme: 'dark' }); await check('system-dark');
+  await p.evaluate(() => document.documentElement.setAttribute('data-theme', 'light')); await check('forced-light');
+  await p.emulateMedia({ colorScheme: 'light' });
+  await p.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark')); await check('forced-dark');
+  await p.evaluate(() => document.documentElement.removeAttribute('data-theme'));
+  // 쿠션 번호는 천 위 글자색 그대로(밝은 노랑)
+  assert.equal(await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--brass-ink').trim()), '#ffdf9a');
+  // 터치 크기: 세그먼트 40px, 글자 링크 36px 이상, 슬라이더 32px
+  const segH = await p.$$eval('.seg button', bs => bs.filter(b => b.offsetParent).map(b => b.getBoundingClientRect().height));
+  assert.ok(segH.length && segH.every(h => h >= 40), JSON.stringify(segH));
+  assert.ok(await p.$eval('#btnHelp', b => b.getBoundingClientRect().height) >= 36);
+  assert.equal(await p.$eval('#spinIn', e => getComputedStyle(e).height), '32px');
+  // 칩 그림: 흰 길 아래 밑선, 테두리 있는 공, 내 공(흰공) 자리에 링
+  const th = await p.$eval('#solChips .chip .thumb', s => {
+    const pl = s.querySelectorAll('polyline'), my = s.querySelector('.my circle');
+    const cue = [...s.querySelectorAll(':scope > circle')].find(c => c.getAttribute('fill') === 'var(--ball-white)');
+    return { pl: pl.length, under: pl[0].getAttribute('stroke-width'), balls: s.querySelectorAll(':scope > circle[stroke]').length,
+      my: my && [my.getAttribute('cx'), my.getAttribute('cy')].join(), cue: cue && [cue.getAttribute('cx'), cue.getAttribute('cy')].join() };
+  });
+  assert.equal(th.pl, 2); assert.equal(th.under, '0.05'); assert.equal(th.balls, 3);
+  assert.ok(th.my && th.my === th.cue, JSON.stringify(th));
+  noErr(p); await p.context().close();
+});
+test('E2E 75: 손으로 누른 탭에 포커스가 남지 않아 리모컨 화살표는 점수 입력, 360px에서 두께 그림은 위로', async () => {
+  const p = await open({ w: 360 });
+  assert.equal(await p.$eval('.thick', e => getComputedStyle(e).flexDirection), 'column');
+  await p.click('.tabs [data-tab="score"]'); await p.click('#scStart');
+  await p.click('.tabs [data-tab="tips"]'); await p.click('.tabs [data-tab="score"]');
+  assert.notEqual(await p.evaluate(() => document.activeElement && document.activeElement.getAttribute('role')), 'tab');
+  await p.keyboard.press('ArrowUp'); await p.keyboard.press('ArrowRight'); await p.keyboard.press('ArrowUp');
+  assert.equal(await p.isVisible('#tabScore'), true);
+  assert.deepEqual(await p.$$eval('.sc-score b', e => e.map(x => x.textContent)), ['1', '1']);
+  // 넓은 화면에서는 두께 그림이 옆에
+  await p.setViewportSize({ width: 412, height: 900 });
+  assert.equal(await p.$eval('.thick', e => getComputedStyle(e).flexDirection), 'row');
+  noErr(p); await p.context().close();
+});

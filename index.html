@@ -12,11 +12,13 @@
   --ink: #13203a;
   --muted: #56657d;
   --line: #d2dae5;
+  --line-strong: #7f8ca1; /* 입력 칸 테두리 */
   --accent: #1b5ccc;
   --accent-ink: #ffffff;
   --accent-soft: #dbe6fa;
   --brass: #c08f2c;
   --brass-ink: #ffdf9a; /* 천 위에 쓰는 쿠션 포인트 숫자 */
+  --brass-text: #82611f; /* 밝은 바탕 위 황동색 글자 */
   --cloth: #2158b8;
   --cloth-deep: #17428f;
   --rail: #4a2f1e;
@@ -27,8 +29,10 @@
   --ball-red: #cf2430;
   --path: #ffffff;
   --path-edge: rgba(8, 18, 40, 0.55);
-  --good: #17805a;
-  --warn: #b26d0a;
+  --good: #147451;
+  --warn: #945b0a;
+  --on-good: #fff;
+  --on-warn: #fff;
   --bad: #bf3434;
   --f-display: "Black Han Sans", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --f-body: "IBM Plex Sans KR", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
@@ -37,20 +41,20 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0c131f; --surface: #131d2c; --surface-2: #1a2637; --ink: #e5ebf4; --muted: #93a2b8; --line: #263449;
-    --accent: #6ea6ff; --accent-ink: #0a1324; --accent-soft: #1b2c4a; --brass: #d8a94c; --brass-ink: #ffe3a8;
+    --bg: #0c131f; --surface: #131d2c; --surface-2: #1a2637; --ink: #e5ebf4; --muted: #93a2b8; --line: #263449; --line-strong: #62718a;
+    --accent: #6ea6ff; --accent-ink: #0a1324; --accent-soft: #1b2c4a; --brass: #d8a94c; --brass-ink: #ffe3a8; --brass-text: var(--brass);
     --cloth: #1f53ad; --cloth-deep: #153a7c; --rail: #3d2617; --rail-hi: #5a3a26; --pearl: #e9dfc4;
     --path: #ffffff; --path-edge: rgba(0, 0, 0, 0.6);
-    --good: #3cc48d; --warn: #e3a33d; --bad: #ef6b6b;
+    --good: #3cc48d; --warn: #e3a33d; --bad: #ef6b6b; --on-good: #0a1324; --on-warn: #1a1206;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0c131f; --surface: #131d2c; --surface-2: #1a2637; --ink: #e5ebf4; --muted: #93a2b8; --line: #263449;
-  --accent: #6ea6ff; --accent-ink: #0a1324; --accent-soft: #1b2c4a; --brass: #d8a94c; --brass-ink: #ffe3a8;
+  --bg: #0c131f; --surface: #131d2c; --surface-2: #1a2637; --ink: #e5ebf4; --muted: #93a2b8; --line: #263449; --line-strong: #62718a;
+  --accent: #6ea6ff; --accent-ink: #0a1324; --accent-soft: #1b2c4a; --brass: #d8a94c; --brass-ink: #ffe3a8; --brass-text: var(--brass);
   --cloth: #1f53ad; --cloth-deep: #153a7c; --rail: #3d2617; --rail-hi: #5a3a26; --pearl: #e9dfc4;
   --path: #ffffff; --path-edge: rgba(0, 0, 0, 0.6);
-  --good: #3cc48d; --warn: #e3a33d; --bad: #ef6b6b;
+  --good: #3cc48d; --warn: #e3a33d; --bad: #ef6b6b; --on-good: #0a1324; --on-warn: #1a1206;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -86,7 +90,7 @@ button { cursor: pointer; }
 .upload:focus-within .btn { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* 실제 파일 입력을 버튼 위에 투명하게 덮어 손가락이 입력 요소를 직접 누르게 함 */
 .file-cover { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font-size: 16px; z-index: 1; }
-.linkish { align-self: flex-start; background: none; border: 0; padding: 2px 0; color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.linkish { align-self: flex-start; background: none; border: 0; padding: 10px 0; color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 ol.help { margin: 0; padding-left: 20px; display: grid; gap: 12px; font-size: 14px; }
 ol.help li { padding-left: 2px; min-width: 0; }
 ol.help li > b { display: block; margin-bottom: 3px; }
@@ -98,7 +102,7 @@ ol.help li > span { display: block; color: var(--muted); font-size: 13px; }
 body.dropping .wrap { outline: 2px dashed var(--accent); outline-offset: -6px; border-radius: 14px; }
 
 .seg { display: inline-flex; background: var(--surface-2); border-radius: 999px; padding: 3px; gap: 2px; }
-.seg button { white-space: nowrap; border: 0; background: transparent; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); min-height: 32px; }
+.seg button { white-space: nowrap; border: 0; background: transparent; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--muted); min-height: 40px; }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
 
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
@@ -156,7 +160,7 @@ body.dropping .wrap { outline: 2px dashed var(--accent); outline-offset: -6px; b
 .num { font-family: var(--f-num); font-variant-numeric: tabular-nums; font-size: 13px; }
 .route { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .route .step { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; background: var(--surface-2); font-size: 13px; font-weight: 600; }
-.route .step .k { font-family: var(--f-num); font-size: 11px; color: var(--brass); }
+.route .step .k { font-family: var(--f-num); font-size: 11px; color: var(--brass-text); }
 .route .arr { color: var(--muted); font-size: 12px; }
 .tipcell { display: flex; align-items: center; gap: 10px; }
 .tipcell svg { width: 44px; height: 44px; flex: none; }
@@ -192,9 +196,9 @@ details.settings summary::after { content: "+"; font-family: var(--f-num); color
 details.settings[open] summary::after { content: "−"; }
 .set-body { padding: 0 14px 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.set-row label { font-size: 14px; font-weight: 600; }
+.set-row label, .set-row > .lbl-main { font-size: 14px; font-weight: 600; }
 .set-row .sub { display: block; font-weight: 400; }
-input[type="range"] { width: 170px; accent-color: var(--accent); }
+input[type="range"] { width: 170px; height: 32px; accent-color: var(--accent); }
 
 .corner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -204,19 +208,19 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
 .tabs button { border: 0; background: none; padding: 10px 12px; font-weight: 700; font-size: 14.5px; color: var(--muted); border-bottom: 2.5px solid transparent; margin-bottom: -1px; white-space: nowrap; }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
 .col { display: flex; flex-direction: column; gap: 14px; }
-.text-in { flex: 1 1 160px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-size: 16px; }
+.text-in { flex: 1 1 160px; min-width: 0; border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-size: 16px; }
 .text-in.mono { font-family: var(--f-num); font-size: 14px; }
 select.text-in { flex: 0 1 260px; min-height: 40px; }
 #scBackupOut { display: block; width: 100%; resize: vertical; color: var(--ink); }
 .row-inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .tipbox { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; display: grid; gap: 6px; }
-.tipbox b { color: var(--brass); font-weight: 700; margin-right: 4px; }
+.tipbox b { color: var(--brass-text); font-weight: 700; margin-right: 4px; }
 .list { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
 .list th, .list td { padding: 8px 6px; border-top: 1px solid var(--line); text-align: left; white-space: nowrap; }
 .list th { color: var(--muted); font-weight: 600; font-size: 12px; border-top: 0; }
 .list td.r, .list th.r { text-align: right; }
 .scroll-x { overflow-x: auto; }
-.mini { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 4px 9px; font-size: 12.5px; font-weight: 600; min-height: 32px; }
+.mini { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 4px 9px; font-size: 12.5px; font-weight: 600; min-height: 40px; }
 .mini.del { color: var(--bad); }
 /* 연습 문제: 첫 공 → 길 이름 두 단계 */
 .practice-row { justify-content: space-between; }
@@ -237,7 +241,7 @@ select.text-in { flex: 0 1 260px; min-height: 40px; }
 .sc-score { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .sc-score b { font-family: var(--f-display); font-weight: 400; font-size: 56px; line-height: 1; font-variant-numeric: tabular-nums; }
 .sc-score label { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
-.sc-score input { width: 58px; border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; background: var(--surface); font-family: var(--f-num); font-size: 16px; }
+.sc-score input { width: 58px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 3px 6px; background: var(--surface); font-family: var(--f-num); font-size: 16px; }
 .sc-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
 .sc-bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width 0.2s; }
 .sc-stats { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 10px; }
@@ -253,7 +257,7 @@ select.text-in { flex: 0 1 260px; min-height: 40px; }
 .sc-p .tgt { font-family: var(--f-num); font-size: 13px; color: var(--muted); }
 .sc-p.win { border-color: var(--good); }
 .badge { font-size: 11px; font-weight: 700; line-height: 1.5; align-self: center; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); }
-.badge.good { background: var(--good); color: #fff; }
+.badge.good { background: var(--good); color: var(--on-good); }
 .badge.soft { background: var(--accent-soft); color: var(--ink); }
 #scFoul { color: var(--bad); }
 .pl-list { display: grid; gap: 8px; }
@@ -267,7 +271,7 @@ select.text-in { flex: 0 1 260px; min-height: 40px; }
 .set-row input[type="checkbox"] { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
 /* 체크박스·숫자 칸 줄: 설명이 길어도 컨트롤은 항상 오른쪽 */
 .set-row.chk > label { flex: 1 1 0; min-width: 0; }
-.num-in { width: 84px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-family: var(--f-num); font-size: 16px; }
+.num-in { width: 84px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-family: var(--f-num); font-size: 16px; }
 .stepper { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
 .stepper .mini { width: 40px; min-height: 40px; font-size: 18px; }
 .stepper b { font-family: var(--f-display); font-weight: 400; font-size: 26px; min-width: 22px; text-align: center; }
@@ -336,7 +340,7 @@ details.tip dt { font-weight: 700; }
 details.tip dd { margin: 0 0 4px; color: var(--muted); }
 .calc { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
-.field input { width: 100px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-family: var(--f-num); font-size: 18px; color: var(--ink); }
+.field input { width: 100px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-family: var(--f-num); font-size: 18px; color: var(--ink); }
 .calc .op { font-family: var(--f-num); font-size: 20px; color: var(--muted); padding-bottom: 8px; }
 .calc-out { font-family: var(--f-display); font-size: 40px; line-height: 1; color: var(--accent); padding-bottom: 2px; }
 /* 파이브앤하프 숫자 자리 그림 (글자 크기는 viewBox 단위) */
@@ -389,6 +393,9 @@ details.settings { box-shadow: var(--shadow); }
 .photo-act { display: flex; flex-direction: column; gap: 8px; }
 .photo-card.compact .photo-copy { display: none; }
 .photo-card.compact { padding: 12px; }
+/* 천 색 위에서는 파란 포커스 링이 안 보여서 흰색 */
+.photo-card :focus-visible, .photo-card .upload:focus-within .btn { outline-color: #fff; }
+label.upload:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* 추천 길 칩: 작은 길 그림 */
 .chip { min-width: 142px; gap: 4px; transition: border-color 0.15s, background-color 0.15s; }
@@ -412,7 +419,7 @@ details.settings { box-shadow: var(--shadow); }
 #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 40;
   width: max-content; max-width: min(520px, calc(100% - 32px)); box-shadow: var(--shadow); background: var(--ink); color: var(--bg); border: 0; padding: 11px 14px; font-weight: 500; }
 #toast.info { background: var(--ink); }
-#toast:not(.info) { background: var(--warn); color: #fff; }
+#toast:not(.info) { background: var(--warn); color: var(--on-warn); }
 @keyframes rise { from { transform: translate(-50%, 10px); opacity: 0; } }
 #toast:not([hidden]) { animation: rise 0.18s ease-out; }
 
@@ -432,6 +439,7 @@ details.settings { box-shadow: var(--shadow); }
 @media (max-width: 759px) {
   .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; gap: 4px; justify-content: space-around; overflow: visible;
     padding: 6px 10px calc(6px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); border-bottom: 0;
+    background: var(--surface);
     background: color-mix(in srgb, var(--surface) 90%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
   .tabs button { flex: 1; flex-direction: column; gap: 2px; font-size: 11.5px; padding: 6px 4px; border-bottom: 0; margin: 0; border-radius: 12px; }
   .tabs button svg { width: 22px; height: 22px; }
@@ -439,6 +447,13 @@ details.settings { box-shadow: var(--shadow); }
   .tabs button.has-live::after { top: 4px; right: auto; left: calc(50% + 9px); }
   .wrap { padding-bottom: calc(var(--nav-h) + 28px + env(safe-area-inset-bottom, 0px)); }
   #toast { bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom, 0px)); }
+  html { scroll-padding-bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom, 0px)); }
+}
+/* 아주 좁은 화면: 표 머리 칸을 줄이고 두께 그림은 글 위로 */
+@media (max-width: 380px) {
+  .kv th { width: 58px; padding-right: 6px; }
+  .thick { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .thick svg { width: 60px; height: 28px; }
 }
 /* 휴대폰 시스템 표·직접 조준: 표를 내려도 당구대가 위에 붙어 있게. 가로로 눕힌 휴대폰(낮은 화면)은 당구대가 표를 덮으므로 붙이지 않음 */
 @media (max-width: 979px) and (min-height: 560px) {
@@ -468,12 +483,12 @@ details.settings { box-shadow: var(--shadow); }
     <button type="button" class="icon-btn" id="btnTheme" aria-label="화면 밝기: 시스템 설정 따름"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"></svg></button>
   </header>
   <nav class="tabs" role="tablist" aria-label="화면">
-    <button type="button" role="tab" id="tabBtnFind" data-tab="find" aria-selected="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M7 15l5-6 3 4 3-3"/><circle cx="7" cy="15" r="1.4" fill="currentColor"/></svg><span>길 찾기</span></button>
-    <button type="button" role="tab" id="tabBtnScore" data-tab="score" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 4v16M7 10v4M15.5 10h2.5v4h-2.5"/></svg><span>점수판</span></button>
-    <button type="button" role="tab" id="tabBtnTips" data-tab="tips" aria-selected="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.9V16h5v-.2c0-.8.4-1.5 1-1.9A6 6 0 0 0 12 3z"/></svg><span>꿀팁 · 시스템</span></button>
+    <button type="button" role="tab" id="tabBtnFind" data-tab="find" aria-selected="true" aria-controls="tabFind" tabindex="0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M7 15l5-6 3 4 3-3"/><circle cx="7" cy="15" r="1.4" fill="currentColor"/></svg><span>길 찾기</span></button>
+    <button type="button" role="tab" id="tabBtnScore" data-tab="score" aria-selected="false" aria-controls="tabScore" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 4v16M7 10v4M15.5 10h2.5v4h-2.5"/></svg><span>점수판</span></button>
+    <button type="button" role="tab" id="tabBtnTips" data-tab="tips" aria-selected="false" aria-controls="tabTips" tabindex="-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.9V16h5v-.2c0-.8.4-1.5 1-1.9A6 6 0 0 0 12 3z"/></svg><span>꿀팁 · 시스템</span></button>
   </nav>
   <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
-  <div id="tabFind" class="col">
+  <div id="tabFind" class="col" role="tabpanel" aria-labelledby="tabBtnFind">
   <section class="photo-card" id="photoCard">
     <div class="photo-copy">
       <h2>공 3개만 놓으면, 득점 길이 나와요</h2>
@@ -626,16 +641,16 @@ details.settings { box-shadow: var(--shadow); }
   <details class="settings" id="settings">
       <summary>테이블 · 내 공 · 보정</summary>
       <div class="set-body">
-        <div class="set-row"><label>테이블 크기<span class="sub">플레이 면 기준</span></label>
-          <div class="seg" id="segTable"><button type="button" data-v="daedae">대대 2844×1422</button><button type="button" data-v="jungdae">중대 2540×1270</button></div></div>
-        <div class="set-row"><label>내 공(수구)</label>
-          <div class="seg" id="segMy"><button type="button" data-v="white">흰공</button><button type="button" data-v="yellow">노란공</button></div></div>
+        <div class="set-row"><span class="lbl-main" id="lblTable">테이블 크기<span class="sub">플레이 면 기준</span></span>
+          <div class="seg" id="segTable" role="group" aria-labelledby="lblTable"><button type="button" data-v="daedae">대대 2844×1422</button><button type="button" data-v="jungdae">중대 2540×1270</button></div></div>
+        <div class="set-row"><span class="lbl-main" id="lblMy">내 공(수구)</span>
+          <div class="seg" id="segMy" role="group" aria-labelledby="lblMy"><button type="button" data-v="white">흰공</button><button type="button" data-v="yellow">노란공</button></div></div>
         <div class="set-row"><label for="spinIn">회전 효과 <span class="num" id="spinOut">×1.0</span><span class="sub">쿠션에서 회전이 덜 먹으면 낮추세요</span></label>
           <input type="range" id="spinIn" min="0.6" max="1.4" step="0.02" value="1"></div>
         <div class="set-row"><label for="cushIn">쿠션 반발 <span class="num" id="cushOut">0.80</span><span class="sub">3쿠션 도착점이 실제와 다르면 조금씩 옮겨 보세요</span></label>
           <input type="range" id="cushIn" min="0.70" max="0.90" step="0.01" value="0.80"></div>
-        <div class="set-row"><label>테이블 속도<span class="sub">필요한 힘 계산에만 쓰여요 (길 모양은 그대로)</span></label>
-          <div class="seg" id="segSpeed"><button type="button" data-v="slow">느림</button><button type="button" data-v="mid">보통</button><button type="button" data-v="fast">빠름</button></div></div>
+        <div class="set-row"><span class="lbl-main" id="lblSpeed">테이블 속도<span class="sub">필요한 힘 계산에만 쓰여요 (길 모양은 그대로)</span></span>
+          <div class="seg" id="segSpeed" role="group" aria-labelledby="lblSpeed"><button type="button" data-v="slow">느림</button><button type="button" data-v="mid">보통</button><button type="button" data-v="fast">빠름</button></div></div>
         <div class="row-inline"><button type="button" class="btn" id="btnCalib">우리 테이블 맞추기</button><span class="sub">코너 50 샷 한 번으로 회전 효과를 맞춰요</span></div>
         <div class="set-row"><label for="tblSel">저장한 테이블<span class="sub">당구장·테이블마다 보정값을 저장해 두고 골라 써요</span></label>
           <select class="text-in" id="tblSel"></select></div>
@@ -644,10 +659,10 @@ details.settings { box-shadow: var(--shadow); }
           <button type="button" class="btn" id="btnTblSave">지금 보정 저장</button>
           <button type="button" class="btn" id="btnTblDel" hidden>지우기</button>
         </div>
-        <div class="set-row"><label>샷 보기 속도<span class="sub">느리게 보면 키스 순간이 잘 보여요</span></label>
-          <div class="seg" id="segPlay"><button type="button" data-v="0.35">아주 느리게</button><button type="button" data-v="0.6">느리게</button><button type="button" data-v="1">실제</button></div></div>
-        <div class="set-row"><label>사진 배경</label>
-          <div class="seg" id="segBg"><button type="button" data-v="on">보기</button><button type="button" data-v="off">끄기</button></div></div>
+        <div class="set-row"><span class="lbl-main" id="lblPlay">샷 보기 속도<span class="sub">느리게 보면 키스 순간이 잘 보여요</span></span>
+          <div class="seg" id="segPlay" role="group" aria-labelledby="lblPlay"><button type="button" data-v="0.35">아주 느리게</button><button type="button" data-v="0.6">느리게</button><button type="button" data-v="1">실제</button></div></div>
+        <div class="set-row"><span class="lbl-main" id="lblBg">사진 배경</span>
+          <div class="seg" id="segBg" role="group" aria-labelledby="lblBg"><button type="button" data-v="on">보기</button><button type="button" data-v="off">끄기</button></div></div>
         <div class="set-row"><button class="btn" type="button" id="btnSample">예시 배치로 돌아가기</button><button class="btn" type="button" id="btnCorners">코너 다시 맞추기</button></div>
       </div>
     </details>
@@ -660,16 +675,16 @@ details.settings { box-shadow: var(--shadow); }
   </div>
 
   <!-- 점수판 -->
-  <section id="tabScore" class="col" hidden>
+  <section id="tabScore" class="col" role="tabpanel" aria-labelledby="tabBtnScore" hidden>
     <button type="button" class="linkish" id="clubLiveJump" hidden></button>
     <div class="panel" id="scSetup">
       <div class="panel-head"><h2>경기 설정</h2><span class="sub">1명은 혼자 연습, 2~6명은 개인전</span></div>
-      <div class="set-row"><label>종목</label>
-        <div class="seg" id="scType"><button type="button" data-v="3c">3쿠션</button><button type="button" data-v="4b">4구 (1득점 10점)</button></div></div>
+      <div class="set-row"><span class="lbl-main" id="lblScType">종목</span>
+        <div class="seg" id="scType" role="group" aria-labelledby="lblScType"><button type="button" data-v="3c">3쿠션</button><button type="button" data-v="4b">4구 (1득점 10점)</button></div></div>
       <div class="set-row chk sc-4b" hidden><label for="scOptFin">마무리 3쿠션<span class="sub">목표 점수 뒤 3쿠션으로 끝내기</span></label><input type="checkbox" id="scOptFin"></div>
       <div class="set-row chk sc-4b" hidden><label for="scOptFoul">파울 −10 버튼<span class="sub">파울이면 10점을 빼고 차례를 넘겨요</span></label><input type="checkbox" id="scOptFoul"></div>
-      <div class="set-row"><label>인원</label>
-        <div class="stepper"><button type="button" class="mini" id="scMinus" aria-label="인원 줄이기">−</button><b id="scCount">2</b><button type="button" class="mini" id="scPlus" aria-label="인원 늘리기">+</button></div></div>
+      <div class="set-row"><span class="lbl-main" id="lblScCount">인원</span>
+        <div class="stepper" role="group" aria-labelledby="lblScCount"><button type="button" class="mini" id="scMinus" aria-label="인원 줄이기">−</button><b id="scCount">2</b><button type="button" class="mini" id="scPlus" aria-label="인원 늘리기">+</button></div></div>
       <div class="pl-head" aria-hidden="true"><span>이름</span><span>목표 점수(핸디)</span></div>
       <div class="pl-list" id="scPlayers"></div>
       <datalist id="rosterNames"></datalist>
@@ -680,12 +695,12 @@ details.settings { box-shadow: var(--shadow); }
       <div class="set-body">
       <div class="set-row chk"><label for="scLimit">이닝 제한<span class="sub">0이면 제한 없음. 혼자 연습이면 '20이닝 에버 측정'처럼 써요</span></label>
         <input class="num-in" id="scLimit" type="number" inputmode="numeric" min="0" max="99" value="0"></div>
-      <div class="set-row"><label>샷 클락<span class="sub">한 샷에 쓸 수 있는 시간. 10초 남으면 소리로 알려요</span></label>
-        <div class="seg" id="scClockSeg"><button type="button" data-v="0">끔</button><button type="button" data-v="30">30초</button><button type="button" data-v="40">40초</button><button type="button" data-v="50">50초</button><button type="button" data-v="60">60초</button></div></div>
+      <div class="set-row"><span class="lbl-main" id="lblScClock">샷 클락<span class="sub">한 샷에 쓸 수 있는 시간. 10초 남으면 소리로 알려요</span></span>
+        <div class="seg" id="scClockSeg" role="group" aria-labelledby="lblScClock"><button type="button" data-v="0">끔</button><button type="button" data-v="30">30초</button><button type="button" data-v="40">40초</button><button type="button" data-v="50">50초</button><button type="button" data-v="60">60초</button></div></div>
       <div class="set-row chk"><label for="scTeam">팀전<span class="sub">이름 칸에 '철수, 영희'처럼 쉼표로 팀원을 적으면 이닝마다 번갈아 쳐요</span></label><input type="checkbox" id="scTeam"></div>
       <div class="set-row chk" id="scLiveRow" hidden><label for="scLive">실시간 중계<span class="sub">같은 링크를 연 클럽 사람들이 점수를 실시간으로 봐요</span></label><input type="checkbox" id="scLive"></div>
       <div class="set-row chk"><label for="scVoice">음성 안내<span class="sub" id="scVoiceSub">득점과 차례를 읽어 줘요</span></label><input type="checkbox" id="scVoice"></div>
-      <div class="set-row"><label>리모컨 · 키보드<span class="sub" id="scKeyInfo"></span></label><button type="button" class="btn sm" id="scKeyLearn">리모컨 버튼 지정</button></div>
+      <div class="set-row"><span class="lbl-main" id="lblScKey">리모컨 · 키보드<span class="sub" id="scKeyInfo"></span></span><button type="button" class="btn sm" id="scKeyLearn" aria-describedby="scKeyInfo">리모컨 버튼 지정</button></div>
       <div class="tipbox" id="scKeyPanel" hidden>
         <div id="scKeyStep"></div>
         <div class="row-inline"><button type="button" class="btn sm" id="scKeySkip">이 동작 건너뛰기</button><button type="button" class="btn sm" id="scKeyReset">기본값으로</button><button type="button" class="btn sm" id="scKeyDone">끝내기</button></div>
@@ -753,7 +768,7 @@ details.settings { box-shadow: var(--shadow); }
   </section>
 
   <!-- 꿀팁 · 시스템 -->
-  <section id="tabTips" class="col" hidden>
+  <section id="tabTips" class="col" role="tabpanel" aria-labelledby="tabBtnTips" hidden>
     <div class="panel">
       <div class="panel-head"><h2>파이브앤하프 계산기</h2><span class="sub">수구 수 − 3쿠션 수 = 1쿠션 겨냥 수</span></div>
       <div class="calc">
@@ -1803,12 +1818,15 @@ if (typeof module !== 'undefined') module.exports = Core;
   function thumbSvg(rec) {
     const t = T(), W = t.W, H = t.H, f = n => n.toFixed(3);
     const pts = rec.path.map(p => `${f(p.x)},${f(H - p.y)}`).join(' ');
-    const b = state.balls, r = Engine.R * 1.6;
+    // 작은 그림이라 공은 크게, 흰 길 아래 어두운 밑선. 내 공은 큰 당구대처럼 파란 링(밝은 화면에서도 보이게 흰 테 위에)
+    const b = state.balls, r = Engine.R * 2.2, my = b[state.myBall];
     return `<svg class="thumb" viewBox="-0.06 -0.06 ${f(W + 0.12)} ${f(H + 0.12)}" aria-hidden="true">
       <rect x="-0.06" y="-0.06" width="${f(W + 0.12)}" height="${f(H + 0.12)}" rx="0.08" fill="var(--rail)"/>
       <rect width="${f(W)}" height="${f(H)}" fill="var(--cloth)"/>
+      <polyline points="${pts}" fill="none" stroke="rgba(8,18,40,.55)" stroke-width="0.05" stroke-linejoin="round" stroke-linecap="round"/>
       <polyline points="${pts}" fill="none" stroke="#fff" stroke-width="0.028" stroke-linejoin="round" stroke-linecap="round"/>
-      ${['red', 'white', 'yellow'].map(k => `<circle cx="${f(b[k].x)}" cy="${f(b[k].y)}" r="${f(r)}" fill="var(--ball-${k})"/>`).join('')}</svg>`;
+      ${['red', 'white', 'yellow'].map(k => `<circle cx="${f(b[k].x)}" cy="${f(b[k].y)}" r="${f(r)}" fill="var(--ball-${k})" stroke="rgba(0,0,0,.5)" stroke-width="0.012"/>`).join('')}
+      <g class="my" fill="none"><circle cx="${f(my.x)}" cy="${f(my.y)}" r="${f(r + 0.035)}" stroke="#fff" stroke-width="0.036"/><circle cx="${f(my.x)}" cy="${f(my.y)}" r="${f(r + 0.035)}" stroke="var(--accent)" stroke-width="0.02"/></g></svg>`;
   }
   function routeTips(s) {
     const out = [], rec = s.rec, c = rec.contact;
@@ -3267,7 +3285,8 @@ if (typeof module !== 'undefined') module.exports = Core;
 
   // ---------- 탭 ----------
   function showTab(tab) {
-    for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+    // 고른 탭만 Tab 키로 들어오고 나머지는 화살표로 옮김
+    for (const b of document.querySelectorAll('.tabs button')) { b.setAttribute('aria-selected', String(b.dataset.tab === tab)); b.tabIndex = b.dataset.tab === tab ? 0 : -1; }
     $('#tabFind').hidden = tab !== 'find';
     $('#tabScore').hidden = tab !== 'score';
     $('#tabTips').hidden = tab !== 'tips';
@@ -3277,7 +3296,16 @@ if (typeof module !== 'undefined') module.exports = Core;
     if (tab === 'find') showView(state.view);
     if (tab === 'score') Score.render();
   }
-  document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
+  // 손으로 누른 탭은 포커스를 놓아서 리모컨 화살표가 점수 입력으로 가게 함
+  document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; showTab(b.dataset.tab); if (e.detail > 0) b.blur(); });
+  document.querySelector('.tabs').addEventListener('keydown', e => {
+    const bs = [...document.querySelectorAll('.tabs button')], i = bs.indexOf(e.target.closest('button'));
+    if (i < 0 || e.altKey || e.ctrlKey || e.metaKey) return;
+    const j = { ArrowLeft: (i + bs.length - 1) % bs.length, ArrowRight: (i + 1) % bs.length, Home: 0, End: bs.length - 1 }[e.key];
+    if (j === undefined) return;
+    e.preventDefault(); e.stopPropagation();
+    bs[j].focus(); showTab(bs[j].dataset.tab);
+  });
 
   // ---------- 파이브앤하프 ----------
   // 그림: 위 장쿠션 = 1쿠션 수, 아래 장쿠션 = 3쿠션 수(둘 다 왼쪽 코너부터 다이아몬드 × 10), 오른쪽 아래 코너 = 수구 50
