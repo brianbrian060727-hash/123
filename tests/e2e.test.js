@@ -386,3 +386,52 @@ test('E2E 32: 가로로 눕힌 휴대폰 큰 화면 — 점수 왼쪽, 버튼 �
   assert.ok(r[2] >= r[1] - 1, JSON.stringify(r));
   noErr(p); await p.context().close();
 });
+
+// 점수판을 다녀와도 당구대 캔버스 크기가 맞고 공이 끌리는지
+async function tableFits(p) {
+  await p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  return p.$eval('#cvTable', c => {
+    const dpr = Math.min(3, window.devicePixelRatio || 1), r = c.getBoundingClientRect();
+    return { cw: c.width / dpr, sw: c.parentElement.clientWidth, ch: c.height / dpr, rh: r.height };
+  });
+}
+async function dragWhite(p) {
+  await p.$eval('#cvTable', c => c.scrollIntoView({ block: 'center' }));
+  const before = await p.inputValue('#codeOut');
+  const box = await p.$eval('#cvTable', c => { const r = c.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width }; });
+  const s = box.w / (2.844 + 0.3), bx = box.x + (0.15 + 0.75) * s, by = box.y + (0.15 + 0.95) * s;
+  await p.mouse.move(bx, by); await p.mouse.down(); await p.mouse.move(bx + 60, by - 20, { steps: 5 }); await p.mouse.up();
+  return before !== await p.inputValue('#codeOut');
+}
+for (const c of [{ w: 400 }, { w: 1200 }, { w: 400, hash: '#score' }, { w: 1200, resize: 900 }]) {
+  test(`E2E 33: 점수판 → 길 찾기로 오가도 당구대가 안 찌그러짐 (${JSON.stringify(c)})`, async () => {
+    const p = await open({ w: c.w, hash: c.hash, noWait: !!c.hash });
+    if (!c.hash) await p.click('.tabs [data-tab="score"]');
+    if (c.resize) await p.setViewportSize({ width: c.resize, height: 900 });
+    await p.click('.tabs [data-tab="find"]'); await p.waitForSelector('.chip');
+    const f = await tableFits(p);
+    assert.ok(Math.abs(f.cw - f.sw) < 2, JSON.stringify(f));
+    assert.ok(Math.abs(f.rh - f.ch) < 2, JSON.stringify(f));
+    assert.ok(await dragWhite(p), '흰공을 끌면 배치 코드가 바뀌어야 함');
+    noErr(p); await p.context().close();
+  });
+}
+test('E2E 34: 점수판에서 붙여넣은 사진은 길 찾기에서 맞는 크기로 열리고, 입력 칸 붙여넣기는 무시', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  const paste = sel => p.evaluate(async sel => {
+    const c = document.createElement('canvas'); c.width = 1000; c.height = 600; const g = c.getContext('2d');
+    g.fillStyle = '#4a2f1e'; g.fillRect(0, 0, 1000, 600); g.fillStyle = '#2158b8'; g.fillRect(100, 100, 800, 400);
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    const dt = new DataTransfer(); dt.items.add(new File([blob], 't.png', { type: 'image/png' }));
+    document.querySelector(sel).dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, sel);
+  await paste('#scPlayers input[data-k="name"]');
+  assert.equal(await p.isVisible('#tabScore'), true);
+  assert.equal(await p.isHidden('#viewCorner'), true);
+  await paste('#tabScore');
+  await p.waitForSelector('#viewCorner:not([hidden])');
+  assert.equal(await p.isVisible('#tabFind'), true);
+  const r = await p.$eval('#cvPhoto', c => ({ cw: c.getBoundingClientRect().width, sw: c.parentElement.clientWidth }));
+  assert.ok(Math.abs(r.cw - r.sw) < 2, JSON.stringify(r));
+  noErr(p); await p.context().close();
+});

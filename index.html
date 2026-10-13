@@ -1691,7 +1691,7 @@ if (typeof module !== 'undefined') module.exports = Core;
   let geo = { s: 100, w: 300, h: 150 };
   function layoutTable() {
     const t = T();
-    const w = cvT.parentElement.clientWidth || 360;
+    const w = cvT.parentElement.clientWidth; if (!w) return; // 숨은 상태면 그대로 둠
     const s = w / (t.W + 2 * RAILV);
     const h = (t.H + 2 * RAILV) * s;
     const dpr = Math.min(3, window.devicePixelRatio || 1);
@@ -2156,7 +2156,7 @@ if (typeof module !== 'undefined') module.exports = Core;
   }
   function layoutPhoto() {
     if (!state.photo) return;
-    const w = cvP.parentElement.clientWidth || 360;
+    const w = cvP.parentElement.clientWidth; if (!w) return;
     const ph = state.photo;
     let k = w / ph.w;
     const maxH = Math.max(320, window.innerHeight * 0.72);
@@ -2255,6 +2255,7 @@ if (typeof module !== 'undefined') module.exports = Core;
   }
   let loading = false;
   async function loadPhoto(file) {
+    if ($('#tabFind').hidden) showTab('find');
     if (loading) return;
     loading = true;
     toast('사진 불러오는 중…', 'info');
@@ -2340,6 +2341,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     return out;
   }
   document.addEventListener('paste', e => {
+    if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
     const fs = clipFiles(e);
     if (fs.some(isImage)) { e.preventDefault(); handleFiles(fs); }
     else if (e.target && e.target.id === 'pasteBox') { e.preventDefault(); toast('복사된 사진이 없어요. 사진을 먼저 복사해 주세요.', 'warn'); }
@@ -2497,7 +2499,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     document.querySelector('.upload-actions').hidden = tab !== 'find';
     if (tab !== 'find') stopAnim();
     if (tab !== 'score') Score.leave();
-    else showView(state.view);
+    if (tab === 'find') showView(state.view);
     if (tab === 'score') Score.render();
   }
   document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
@@ -3143,13 +3145,15 @@ if (typeof module !== 'undefined') module.exports = Core;
   syncQuickMy();
 
   // ---------- 시작 ----------
-  let lastW = 0;
+  // 캔버스 바로 위 상자를 지켜봄: 숨김→보임 전환과 #score로 시작한 경우도 여기서 다시 잡힘
   const ro = new ResizeObserver(() => {
-    const w = document.querySelector('.wrap').clientWidth;
-    if (w === lastW) return; lastW = w;
-    if (state.view === 'table') { layoutTable(); drawTable(); } else { layoutPhoto(); drawPhoto(); }
+    if ($('#tabFind').hidden) return;
+    if (state.view === 'table') {
+      if (Math.abs(cvT.parentElement.clientWidth - geo.w) > 0.5) { layoutTable(); drawTable(); }
+    } else if (state.photo) { layoutPhoto(); drawPhoto(); }
   });
-  ro.observe(document.querySelector('.wrap'));
+  ro.observe(cvT.parentElement);
+  ro.observe($('#cvPhoto').parentElement);
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   if (mq.addEventListener) mq.addEventListener('change', () => drawTable());
   new MutationObserver(() => drawTable()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
