@@ -2695,9 +2695,15 @@ if (typeof module !== 'undefined') module.exports = Core;
     try {
       const v = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (v && v.cfg && Array.isArray(v.cfg.players) && v.cfg.players.length) cfg = Object.assign(cfg, v.cfg);
-      if (v && v.g && Array.isArray(v.g.players)) g = v.g;
+      if (v && v.g && Array.isArray(v.g.players)) {
+        g = v.g;
+        if (Array.isArray(v.undo)) undo = v.undo.filter(x => typeof x === 'string').slice(-50);
+      }
     } catch (e) { /* 없음 */ }
-    const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ cfg, g })); } catch (e) { /* 무시 */ } };
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ cfg, g, undo: undo.slice(-50) })); } catch (e) { /* 무시 */ } };
+    // 저장이 막힌 화면이면 경기 설정 위에 미리 알림
+    try { localStorage.setItem('cue3-t', '1'); localStorage.removeItem('cue3-t'); }
+    catch (e) { $('#scSetup .panel-head').insertAdjacentHTML('afterend', "<p class='hint' id='scNoStore'>이 화면에서는 기록이 저장되지 않아요. 경기가 끝나면 '결과 복사'를 눌러 두세요.</p>"); }
     const hist = () => { try { const a = JSON.parse(localStorage.getItem(HKEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
     const fmtAvg = p => SC.avg(p).toFixed(3);
     const who = i => g.team ? `${g.players[i].name.split(/[,·/]/)[0].trim()}팀 ${SC.shooter(g.players[i])}` : g.players[i].name;
@@ -2728,7 +2734,7 @@ if (typeof module !== 'undefined') module.exports = Core;
       } catch (e) { /* 소리 없음 */ }
       try { navigator.vibrate && navigator.vibrate(d * 1000); } catch (e) { /* 무시 */ }
     }
-    let lock = null, vid = null, vtimer = 0;
+    let lock = null, lockP = null, awakeOn = false, vid = null, vtimer = 0;
     // 표준 화면 켜짐 유지가 막힌 화면에서는 보이지 않는 무음 영상을 재생해 화면이 꺼지지 않게 함
     function videoAwake(on) {
       try {
@@ -2754,21 +2760,31 @@ if (typeof module !== 'undefined') module.exports = Core;
     }
     function awakeNote(t) { const el = $('#scAwake'); if (el) el.textContent = t; }
     async function keepAwake(on) {
+      awakeOn = on;
       if (!on) { try { if (lock) await lock.release(); } catch (e) { /* 무시 */ } lock = null; videoAwake(false); awakeNote(''); return; }
-      if (lock) return;
+      if (lock || lockP) return;
       try {
-        if (navigator.wakeLock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); videoAwake(false); awakeNote('화면 켜짐 유지 중'); return; }
-      } catch (e) { lock = null; }
+        if (navigator.wakeLock) {
+          lockP = navigator.wakeLock.request('screen');
+          const l = await lockP;
+          // 요청하는 동안 경기가 끝났으면 바로 놓음
+          if (!awakeOn) { l.release().catch(() => {}); return; }
+          lock = l; l.addEventListener('release', () => { if (lock === l) lock = null; });
+          videoAwake(false); awakeNote('화면 켜짐 유지 중'); return;
+        }
+      } catch (e) { lock = null; } finally { lockP = null; }
+      if (!awakeOn) return;
       awakeNote(videoAwake(true) ? '화면 켜짐 유지 중 (보조 방식). 그래도 꺼지면 휴대폰 설정에서 화면 자동 꺼짐 시간을 늘려 주세요.' : '이 화면에서는 화면 켜짐 유지가 막혀 있어요. 휴대폰 설정에서 화면 자동 꺼짐 시간을 늘려 주세요.');
     }
     document.addEventListener('visibilitychange', () => { if (document.hidden) save(); else if (g && !g.done) keepAwake(true); });
     window.addEventListener('pagehide', () => save());
 
     // 샷 클락
-    const clk = { left: 0, timer: 0, last: 0, ext: [] };
+    const clk = { left: 0, timer: 0, last: 0, hold: null };
     function clockReset() {
       const n = +cfg.clock;
       clearInterval(clk.timer);
+      if ($('#scMsg').textContent.startsWith('시간 초과')) msg('');
       $('#scClock').hidden = !n || !g || g.done;
       if (!n || !g || g.done) return;
       clk.left = n; clk.last = Math.ceil(n);
@@ -2788,11 +2804,22 @@ if (typeof module !== 'undefined') module.exports = Core;
       $('#scClockNum').textContent = Math.ceil(clk.left);
       $('#scClock').classList.toggle('warn', clk.left <= 10 && clk.left > 0);
       $('#scClock').classList.toggle('over', clk.left <= 0);
-      $('#scExt').disabled = !g || !!clk.ext[g.turn];
+      $('#scExt').disabled = !g || usedExt();
+    }
+    // 연장은 선수마다 한 번. 경기 기록(g)에 둬서 되돌리기와 저장에 같이 들어감
+    const usedExt = () => Array.isArray(g.ext) && g.ext.includes(g.turn);
+    // 탭을 다녀오면 남은 시간부터 이어 감
+    function clockResume(left) {
+      clearInterval(clk.timer); clk.timer = 0;
+      $('#scClock').hidden = false;
+      clk.left = left; clk.last = Math.ceil(left);
+      if (left > 0) clk.timer = setInterval(clockTick, 100);
+      clockDraw();
     }
     $('#scExt').addEventListener('click', () => {
-      if (!g || clk.ext[g.turn]) return;
-      clk.ext[g.turn] = true; clk.left += +cfg.clock; clk.last = Math.ceil(clk.left); msg(''); clockDraw();
+      if (!g || usedExt()) return;
+      if (!Array.isArray(g.ext)) g.ext = [];
+      g.ext.push(g.turn); save(); clk.left += +cfg.clock; clk.last = Math.ceil(clk.left); msg(''); clockDraw();
       clearInterval(clk.timer); clk.timer = setInterval(clockTick, 100);
     });
 
@@ -2870,9 +2897,11 @@ if (typeof module !== 'undefined') module.exports = Core;
     $('#scClockSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; cfg.clock = b.dataset.v; renderSetup(); save(); });
     $('#scStart').addEventListener('click', () => {
       unlockAudio();
-      g = SC.create(cfg.players, { limit: cfg.limit, team: cfg.team, step: cfg.type === '4b' ? 10 : 1 }); g.kind = cfg.type; undo = []; clk.ext = [];
+      learn = -1; learnStep();
+      g = SC.create(cfg.players, { limit: cfg.limit, team: cfg.team, step: cfg.type === '4b' ? 10 : 1 }); g.kind = cfg.type; g.ext = []; undo = []; clk.hold = null;
       g.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
       msg(''); keepAwake(true); render(); clockReset();
+      $('#scGame').scrollIntoView({ block: 'start' });
       say(`${who(0)} 차례`);
     });
 
@@ -2886,6 +2915,7 @@ if (typeof module !== 'undefined') module.exports = Core;
         if (g.closing) msg(`목표 도달! 같은 이닝을 끝까지 돌려요. ${who(g.turn)} 차례.`);
       }
       render(); clockReset();
+      if (document.body.classList.contains('focus')) { const c = $('#scBoard .sc-p.on'); if (c) c.scrollIntoView({ block: 'nearest' }); }
     }
     function onDone() {
       const res = SC.result(g);
@@ -2919,7 +2949,7 @@ if (typeof module !== 'undefined') module.exports = Core;
       delete b.dataset.armed; b.textContent = '새 경기';
       newGame();
     });
-    const newGame = () => { g = null; undo = []; clearInterval(clk.timer); keepAwake(false); setFocus(false); msg(''); prevScores = []; render(); };
+    const newGame = () => { g = null; undo = []; clearInterval(clk.timer); clk.timer = 0; clk.hold = null; keepAwake(false); setFocus(false); msg(''); prevScores = []; render(); window.scrollTo(0, 0); };
     function setFocus(on) {
       document.body.classList.toggle('focus', on);
       $('#scBig').textContent = on ? '작은 화면' : '큰 화면';
@@ -3033,46 +3063,80 @@ if (typeof module !== 'undefined') module.exports = Core;
       const custom = ACT.filter(([a]) => keymap[a] && keymap[a].length).map(([a, l]) => `${l} ${keymap[a].map(keyName).join('/')}`);
       $('#scKeyInfo').textContent = custom.length ? `지정됨: ${custom.join(' · ')} (기본 키도 함께 동작)` : '기본: Space·↑ 득점, Enter·↓ 공타, ← 되돌리기';
     }
-    let learn = -1;
+    // 배우는 동안은 draft에 모으고, 끝날 때 배운 동작만 keymap에 합침(아무것도 안 배우면 그대로)
+    let learn = -1, draft = null;
     function learnStep() {
-      if (learn < 0 || learn >= ACT.length) { learn = -1; $('#scKeyPanel').hidden = true; renderKeyInfo(); return; }
+      if (learn < 0 || learn >= ACT.length) {
+        learn = -1; $('#scKeyPanel').hidden = true;
+        if (draft) {
+          const got = ACT.filter(([a]) => draft[a].length).map(([a]) => a);
+          if (got.length) {
+            const used = new Set(got.flatMap(a => draft[a]));
+            for (const [a] of ACT) keymap[a] = got.includes(a) ? draft[a].slice() : (keymap[a] || []).filter(k => !used.has(k));
+            try { localStorage.setItem(KKEY, JSON.stringify(keymap)); } catch (err) { /* 무시 */ }
+          }
+          draft = null;
+        }
+        renderKeyInfo(); return;
+      }
       $('#scKeyPanel').hidden = false;
       $('#scKeyStep').textContent = `${learn + 1}/3 · '${ACT[learn][1]}'에 쓸 리모컨 버튼을 한 번 누르세요`;
     }
-    $('#scKeyLearn').addEventListener('click', () => { learn = 0; keymap = { hit: [], miss: [], undo: [] }; learnStep(); $('#scKeyLearn').blur(); });
-    $('#scKeySkip').addEventListener('click', () => { learn++; learnStep(); });
+    $('#scKeyLearn').addEventListener('click', () => { learn = 0; draft = { hit: [], miss: [], undo: [] }; learnStep(); $('#scKeyLearn').blur(); });
+    $('#scKeySkip').addEventListener('click', e => { learn++; learnStep(); if (e.detail > 0) e.currentTarget.blur(); }); // 눌러 둔 버튼에 포커스가 남으면 다음 키를 못 배움
     $('#scKeyDone').addEventListener('click', () => { learn = -1; learnStep(); });
-    $('#scKeyReset').addEventListener('click', () => { keymap = { hit: [], miss: [], undo: [] }; try { localStorage.removeItem(KKEY); } catch (e) { /* 무시 */ } learn = -1; learnStep(); });
+    $('#scKeyReset').addEventListener('click', () => { keymap = { hit: [], miss: [], undo: [] }; draft = null; try { localStorage.removeItem(KKEY); } catch (e) { /* 무시 */ } learn = -1; learnStep(); });
     document.addEventListener('keydown', e => {
-      if (learn < 0) return;
+      if (learn < 0 || e.repeat) return;
+      // 이름 칸 입력이나 패널 버튼 누르기는 배우지 않음
+      if (e.target.closest && e.target.closest('input, textarea, [contenteditable], #scKeyPanel button')) return;
       if (['Shift', 'Control', 'Alt', 'Meta', 'Tab', 'Escape'].includes(e.key)) { if (e.key === 'Escape') { learn = -1; learnStep(); } return; }
       e.preventDefault(); e.stopImmediatePropagation();
-      for (const [a] of ACT) keymap[a] = (keymap[a] || []).filter(k => k !== e.key);
-      keymap[ACT[learn][0]].push(e.key);
-      try { localStorage.setItem(KKEY, JSON.stringify(keymap)); } catch (err) { /* 무시 */ }
+      if (!draft) draft = { hit: [], miss: [], undo: [] };
+      for (const [a] of ACT) draft[a] = draft[a].filter(k => k !== e.key);
+      draft[ACT[learn][0]].push(e.key);
       toast(`'${ACT[learn][1]}' = ${keyName(e.key)}`, 'info');
       learn++; learnStep();
     }, true);
     // 키보드 · 블루투스 리모컨(페이지 넘김 버튼은 화살표 키를 보냄)
+    // Tab으로 고른 버튼만 Space/Enter를 버튼에 맡김(손으로 누른 버튼에 포커스가 남아도 리모컨 키는 원래 뜻대로)
+    let kbNav = false;
+    document.addEventListener('keydown', e => { if (e.key === 'Tab') kbNav = true; }, true);
+    document.addEventListener('pointerdown', () => { kbNav = false; }, true);
+    $('#scGame').addEventListener('click', e => { const b = e.target.closest('button'); if (b && e.detail > 0) b.blur(); });
+    $('#scGame').addEventListener('pointerdown', () => { if (g && !g.done && !lock) keepAwake(true); });
     document.addEventListener('keydown', e => {
       if (learn >= 0 || $('#tabScore').hidden || !g || e.altKey || e.ctrlKey || e.metaKey) return;
       const tg = e.target; if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.isContentEditable)) return;
       const k = e.key;
       let id = null;
       const custom = ACT.find(([a]) => (keymap[a] || []).includes(k));
-      if (custom) { e.preventDefault(); $({ hit: '#scHit', miss: '#scMiss', undo: '#scUndo' }[custom[0]]).click(); return; }
-      if (k === ' ' || k === 'ArrowUp' || k === 'PageUp') id = '#scHit';
+      if (custom) id = { hit: '#scHit', miss: '#scMiss', undo: '#scUndo' }[custom[0]];
+      else if (k === ' ' || k === 'ArrowUp' || k === 'PageUp') id = '#scHit';
       else if (k === 'Enter' || k === 'ArrowDown' || k === 'PageDown' || k === 'ArrowRight') id = '#scMiss';
       else if (k === 'ArrowLeft' || k === 'Backspace' || k === 'z' || k === 'Z') id = '#scUndo';
       if (!id) return;
-      if (tg && tg.tagName === 'BUTTON' && (k === ' ' || k === 'Enter')) return; // 버튼 위에선 그 버튼 동작 그대로
-      e.preventDefault(); $(id).click();
+      if (!custom && tg && tg.tagName === 'BUTTON' && kbNav && (k === ' ' || k === 'Enter')) return; // Tab으로 고른 버튼은 그 버튼 동작 그대로
+      e.preventDefault();
+      if (!e.repeat) $(id).click(); // 꾹 누르면 한 번만(반복 키는 화면 스크롤만 막음)
     });
     if (g && g.done) msg(`지난 경기 결과 · ${SC.result(g)}`);
     return {
       localHistory: () => hist(),
-      render: () => { render(); if (g && !g.done && +cfg.clock && !clk.timer) clockReset(); },
-      leave: () => { setFocus(false); clearInterval(clk.timer); clk.timer = 0; }
+      render: () => {
+        render();
+        if (g && !g.done) keepAwake(true);
+        if (g && !g.done && +cfg.clock && !clk.timer) {
+          const h = clk.hold; clk.hold = null;
+          if (h && h.key === g.round + ':' + g.turn) clockResume(h.left); else clockReset();
+        }
+      },
+      leave: () => {
+        learn = -1; learnStep(); setFocus(false);
+        // 돌던 샷 클락만 남은 시간을 기억(처음 열 때나 이미 멈춘 뒤엔 덮어쓰지 않음)
+        if (clk.timer) clk.hold = { left: clk.left, key: g ? g.round + ':' + g.turn : '' };
+        clearInterval(clk.timer); clk.timer = 0;
+      }
     };
   })();
 

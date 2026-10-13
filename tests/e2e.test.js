@@ -495,3 +495,94 @@ test('E2E 37: 다시 계산하는 동안 지난 길은 지우고, 몰린 계산�
   assert.deepEqual(p.errors, []);
   await ctx.close();
 });
+test('E2E 38: 손가락으로 득점을 누른 뒤 리모컨 Enter는 공타, 꾹 누른 키는 한 번만', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 400, height: 900 }, hasTouch: true });
+  const p = await ctx.newPage();
+  p.errors = []; p.on('pageerror', e => p.errors.push(e.message));
+  await p.goto('file://' + page + '#score');
+  await p.click('#scStart');
+  const scores = () => p.$$eval('.sc-score b', e => e.map(x => x.textContent));
+  await p.tap('#scHit'); await p.keyboard.press('Enter');
+  assert.deepEqual(await scores(), ['1', '0']);
+  assert.match(await p.textContent('#scInfo'), /선수 B 차례/);
+  // 꾹 누르면 반복 keydown(repeat)이 와도 +1만
+  await p.keyboard.down('ArrowUp'); await p.keyboard.down('ArrowUp'); await p.keyboard.down('ArrowUp'); await p.keyboard.up('ArrowUp');
+  assert.deepEqual(await scores(), ['1', '1']);
+  // Tab으로 고른 버튼은 Enter가 그 버튼 동작(결과 복사)
+  await p.keyboard.press('Tab'); await p.focus('#scCopy'); await p.keyboard.press('Enter');
+  assert.deepEqual(await scores(), ['1', '1']);
+  assert.match(await p.textContent('#scInfo'), /선수 B 차례/);
+  assert.equal(await p.isVisible('#scMsg'), true);
+  assert.deepEqual(p.errors, []);
+  await ctx.close();
+});
+test('E2E 39: 리모컨 버튼 지정 — 이름 칸 입력은 안 배우고, 취소하면 지난 지정 유지', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  const keys = () => p.evaluate(() => localStorage.getItem('cue3-keys'));
+  await p.click('#scKeyLearn');
+  await p.click('#scPlayers input[data-k="name"]'); await p.keyboard.type('abc');
+  assert.equal(await keys(), null);
+  assert.match(await p.textContent('#scKeyStep'), /^1\/3/);
+  await p.click('#scKeyDone');
+  assert.equal(await keys(), null);
+  await p.click('#scKeyLearn');
+  await p.keyboard.press('k'); await p.keyboard.press('j'); await p.keyboard.press('u');
+  assert.deepEqual(JSON.parse(await keys()), { hit: ['k'], miss: ['j'], undo: ['u'] });
+  // 다시 지정하다 Escape: 그대로
+  await p.click('#scKeyLearn'); await p.keyboard.press('Escape');
+  assert.deepEqual(JSON.parse(await keys()), { hit: ['k'], miss: ['j'], undo: ['u'] });
+  assert.match(await p.textContent('#scKeyInfo'), /득점 k/);
+  // 득점만 새로 배우고 끝내기: 나머지는 그대로
+  await p.click('#scKeyLearn'); await p.keyboard.press('x'); await p.click('#scKeyDone');
+  assert.deepEqual(JSON.parse(await keys()), { hit: ['x'], miss: ['j'], undo: ['u'] });
+  noErr(p); await p.context().close();
+});
+test('E2E 40: 경기 시작하면 점수판이 화면 안에, 새 경기는 맨 위로', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, hasTouch: true });
+  const p = await ctx.newPage();
+  p.errors = []; p.on('pageerror', e => p.errors.push(e.message));
+  await p.goto('file://' + page + '#score');
+  for (let i = 0; i < 4; i++) await p.click('#scPlus');
+  await p.click('#scStart');
+  const top = await p.$eval('#scBoard', e => e.getBoundingClientRect().top);
+  assert.ok(top >= 0 && top < 740, String(top));
+  // 큰 화면에서 차례가 넘어가면 지금 선수 카드가 보이게
+  await p.click('#scBig');
+  for (let i = 0; i < 5; i++) await p.keyboard.press('ArrowDown');
+  assert.match(await p.textContent('#scInfo'), /선수 F 차례/);
+  const r = await p.$eval('#scBoard .sc-p.on', e => { const b = e.getBoundingClientRect(); return [b.top, b.bottom]; });
+  assert.ok(r[0] >= -1 && r[1] <= 741, JSON.stringify(r));
+  await p.click('#scBig');
+  await p.click('#scNew'); await p.click('#scNew');
+  assert.equal(await p.evaluate(() => window.scrollY), 0);
+  assert.deepEqual(p.errors, []);
+  await ctx.close();
+});
+test('E2E 41: 새로 고쳐도 되돌리기와 연장 기록이 남고, 탭을 다녀오면 샷 클락은 이어 감', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  await p.click('#scClockSeg [data-v="30"]'); await p.click('#scStart');
+  await p.click('#scExt'); await p.click('#scHit');
+  await p.reload(); await p.waitForSelector('#scGame:not([hidden])');
+  assert.equal(await p.isDisabled('#scExt'), true);
+  assert.equal(await p.isDisabled('#scUndo'), false);
+  await p.click('#scUndo');
+  assert.deepEqual(await p.$$eval('.sc-score b', e => e.map(x => x.textContent)), ['0', '0']);
+  assert.equal(await p.isDisabled('#scExt'), true);
+  // 남은 시간이 28초 이하가 된 뒤 탭을 다녀와도 30초로 다시 채우지 않음
+  await p.waitForFunction(() => +document.querySelector('#scClockNum').textContent <= 28, null, { timeout: 10000 });
+  await p.click('.tabs [data-tab="tips"]'); await p.click('.tabs [data-tab="score"]');
+  assert.ok(+(await p.textContent('#scClockNum')) <= 28);
+  noErr(p); await p.context().close();
+});
+test('E2E 42: 저장이 막힌 화면이면 경기 설정에 미리 알림', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 400, height: 900 } });
+  await ctx.addInitScript(() => { Storage.prototype.setItem = function () { throw new DOMException('막힘', 'QuotaExceededError'); }; });
+  const p = await ctx.newPage();
+  p.errors = []; p.on('pageerror', e => p.errors.push(e.message));
+  await p.goto('file://' + page + '#score');
+  assert.match(await p.textContent('#scSetup'), /기록이 저장되지 않아요/);
+  await p.click('#scStart'); await p.click('#scHit');
+  assert.deepEqual(await p.$$eval('.sc-score b', e => e.map(x => x.textContent)), ['1', '0']);
+  assert.deepEqual(p.errors, []);
+  await ctx.close();
+});
