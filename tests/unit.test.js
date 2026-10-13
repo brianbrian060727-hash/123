@@ -183,8 +183,12 @@ test('배치 코드: 테이블 밖 좌표는 안으로', () => {
 const ev = (...xs) => ({ evs: xs.map(x => typeof x === 'number' ? { type: 'c', rail: x } : { type: x }) });
 for (const [rec, name] of [
   [ev('b', 2, 3, 0, 'b2'), '돌리기'], [ev('b', 0, 2, 1, 'b2'), '횡단샷'], [ev('b', 1, 2, 3, 'b2'), '대회전'],
-  [ev('b', 3, 0, 1, 'b2'), '대회전'], [ev('b', 1, 2, 'b2'), '빗겨치기'], [ev(2, 'b', 3, 0, 'b2'), '빈쿠션 1쿠션'],
-  [ev(2, 3, 'b', 0, 'b2'), '빈쿠션 2쿠션'], [ev(2, 3, 0, 'b', 'b2'), '뱅크샷']
+  [ev('b', 3, 0, 1, 'b2'), '대회전'], [ev('b', 1, 2, 'b2'), '비껴치기'], [ev(2, 'b', 3, 0, 'b2'), '빈쿠션 1쿠션'],
+  [ev(2, 3, 'b', 0, 'b2'), '빈쿠션 2쿠션'], [ev(2, 3, 0, 'b', 'b2'), '빈쿠션 3쿠션'],
+  // 장·단이 번갈아야 대회전: 단-단-장, 장-단-단-장은 대회전이 아님
+  [ev('b', 1, 1, 2, 'b2'), '비껴치기'], [ev('b', 0, 1, 1, 2, 'b2'), '쿠션 길'],
+  [ev('b', 1, 2, 3, 0, 'b2'), '대회전'], [ev('b', 0, 1, 2, 3, 'b2'), '대회전'], [ev('b', 1, 0, 'b2'), '비껴치기'],
+  [ev(0, 1, 2, 3, 'b', 'b2'), '빈쿠션 4쿠션']
 ]) test(`길 이름: ${name} (${rec.evs.map(e => e.type === 'c' ? e.rail : e.type).join(',')})`, () => assert.equal(Core.routeName(rec).name, name));
 
 // ---------- 점수 규칙 ----------
@@ -228,6 +232,20 @@ test('점수: 첫 차례는 1이닝 시작 상태', () => { const g = SC.create(
 test('점수: 순위는 달성 → 달성률 → 에버', () => {
   const g = play(SC.create(P(10, 10, 10), { limit: 1 }), 'hhm' + 'hhm' + 'hm');
   const st = SC.standings(g).map(s => s.i); assert.equal(st[2], 2);
+});
+test('길 이름: 빈쿠션 3쿠션 이상도 쿠션 순서를 함께 줌', () => {
+  const r = Core.routeName(ev(2, 3, 0, 'b', 1, 'b2')); assert.equal(r.name, '빈쿠션 3쿠션'); assert.equal(r.seq, '단');
+});
+test('점수: 핸디 경기에서 달성률이 같으면 무승부 (점수가 많아도)', () => {
+  const g = SC.create([{ name: 'A', target: 20 }, { name: 'B', target: 30 }], { limit: 1 });
+  play(g, 'h'.repeat(10) + 'm' + 'h'.repeat(15) + 'm');
+  assert.ok(g.done); assert.equal(g.players[0].score, 10); assert.equal(g.players[1].score, 15);
+  assert.match(SC.result(g), /^무승부 \(/); assert.match(SC.result(g), /A/); assert.match(SC.result(g), /B/);
+});
+test('점수: 핸디 경기에서 달성률이 높으면 점수가 적어도 승', () => {
+  const g = SC.create([{ name: 'A', target: 20 }, { name: 'B', target: 30 }], { limit: 1 });
+  play(g, 'h'.repeat(11) + 'm' + 'h'.repeat(15) + 'm');
+  assert.equal(SC.result(g), 'A 승'); assert.equal(SC.standings(g)[0].i, 0);
 });
 test('점수: 혼자 연습 결과 문구', () => { const g = play(SC.create(P(2)), 'hmh'); assert.match(SC.result(g), /목표 2점 달성 · 2이닝 · 에버 1\.000/); });
 test('점수: 혼자 이닝 제한 결과 문구', () => { const g = play(SC.create(P(9), { limit: 2 }), 'hmm'); assert.match(SC.result(g), /2이닝 동안 1점/); });
@@ -279,6 +297,13 @@ test('4구: 한 번 득점에 10점, 목표에서 멈춤', () => {
   const g = SC.create([{ name: 'a', target: 30 }, { name: 'b', target: 30 }], { step: 10 });
   play(g, 'hh'); assert.equal(g.players[0].score, 20); assert.equal(g.players[0].high, 20);
   play(g, 'h'); assert.equal(g.players[0].score, 30); assert.equal(g.turn, 1);
+});
+test('4구: 목표를 넘는 득점은 기록·하이런에 넣지 않음', () => {
+  const g = SC.create([{ name: 'a', target: 155 }, { name: 'b', target: 155 }], { step: 10 });
+  play(g, 'h'.repeat(16));
+  const p = g.players[0];
+  assert.equal(p.score, 155); assert.equal(p.log[p.log.length - 1], 155); assert.equal(p.high, 155);
+  assert.notEqual(p.high, 160); assert.equal(p.log.reduce((a, b) => a + b, 0), p.score); assert.equal(g.turn, 1);
 });
 test('4구: 목표 범위 5000까지', () => { const g = SC.create([{ name: 'a', target: 3000 }], { step: 10 }); assert.equal(g.players[0].target, 3000); });
 

@@ -1413,16 +1413,18 @@ const Core = (() => {
   // ---- 길 이름 (장=장쿠션 레일 0·2, 단=단쿠션 레일 1·3)
   function routeName(rec) {
     const bi = rec.evs.findIndex(e => e.type === 'b');
-    if (bi >= 3) return { name: '뱅크샷', seq: '' };
     const rails = rec.evs.filter((e, i) => e.type === 'c' && i > bi).map(e => e.rail);
     const seq = rails.slice(0, 4).map(r => (r === 0 || r === 2) ? '장' : '단').join('-');
     if (bi > 0) return { name: `빈쿠션 ${bi}쿠션`, seq };
     const f4 = rails.slice(0, 4);
+    // 대회전: 장·단이 번갈아 나오며 양쪽 단쿠션을 모두 거침 (단-단-장 같은 길은 제외)
+    const t = f4.map(r => r % 2);
+    const alt = t.every((v, i) => !i || v !== t[i - 1]);
     let name;
-    if (f4.includes(1) && f4.includes(3)) name = '대회전';
+    if (f4.length >= 3 && alt && f4.includes(1) && f4.includes(3)) name = '대회전';
     else if (seq.startsWith('장-장')) name = '횡단샷';
-    else if (seq.startsWith('단')) name = '빗겨치기';
     else if (seq.startsWith('장-단-장')) name = '돌리기';
+    else if (seq.startsWith('단')) name = '비껴치기';
     else name = '쿠션 길';
     return { name, seq };
   }
@@ -1459,18 +1461,19 @@ const Core = (() => {
   function hit(g) {
     if (g.done) return g;
     const p = g.players[g.turn];
-    const st = g.step || 1;
-    p.score = Math.min(p.target, p.score + st); p.log[p.log.length - 1] += st; g.run += st; p.high = Math.max(p.high, g.run);
+    // 4구: 목표를 넘는 몫은 기록·연속·하이런에도 넣지 않음
+    const d = Math.min(g.step || 1, p.target - p.score);
+    p.score += d; p.log[p.log.length - 1] += d; g.run += d; p.high = Math.max(p.high, g.run);
     if (p.score >= p.target) { g.closing = true; endTurn(g); }
     return g;
   }
   function miss(g) { if (!g.done) endTurn(g); return g; }
   const avg = p => p.inn > 0 ? p.score / p.inn : 0;
   const shooter = p => (p.members && p.members.length) ? p.members[(Math.max(1, p.inn) - 1) % p.members.length] : p.name;
-  // 순위: 목표 달성 여부 → 달성률(핸디 공정) → 에버리지
+  // 순위: 목표 달성 여부 → 달성률(핸디 공정) → 목표 대비 에버리지
   function standings(g) {
     return g.players.map((p, i) => ({ i, p, reached: p.score >= p.target, ratio: p.score / p.target, avg: avg(p) }))
-      .sort((a, b) => (b.reached - a.reached) || (b.ratio - a.ratio) || (b.avg - a.avg));
+      .sort((a, b) => (b.reached - a.reached) || (b.ratio - a.ratio) || (b.avg / b.p.target - a.avg / a.p.target));
   }
   function result(g) {
     if (!g.done) return '';
@@ -1479,7 +1482,8 @@ const Core = (() => {
       const p = g.players[0];
       return p.score >= p.target ? `목표 ${p.target}점 달성 · ${p.inn}이닝 · 에버 ${avg(p).toFixed(3)}` : `${p.inn}이닝 동안 ${p.score}점 · 에버 ${avg(p).toFixed(3)}`;
     }
-    const top = st.filter(s => s.reached === st[0].reached && Math.abs(s.ratio - st[0].ratio) < 1e-9 && (st[0].reached || Math.abs(s.avg - st[0].avg) < 1e-9));
+    // 함께 목표에 닿았거나, 아무도 못 닿았는데 달성률이 같으면 무승부 (핸디 경기에서 점수만 많다고 이기지 않음)
+    const top = st.filter(s => s.reached === st[0].reached && Math.abs(s.ratio - st[0].ratio) < 1e-9);
     return top.length > 1 ? `무승부 (${top.map(s => s.p.name).join(', ')})` : `${st[0].p.name} 승`;
   }
   return { encodeLayout, decodeLayout, routeName, score: { create, hit, miss, avg, shooter, standings, result } };
@@ -3436,7 +3440,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     const facts = [
       `테이블: ${t.name} (${t.W}m x ${t.H}m). 포인트는 화면 기준 장쿠션 왼쪽 0~오른쪽 8, 단쿠션 위 0~아래 4.`,
       `수구(${BALLNAME[state.myBall]}) 위치: ${pt(state.balls[state.myBall])}. 빨간공: ${pt(state.balls.red)}. ${BALLNAME[otherKey()]}: ${pt(state.balls[otherKey()])}.`,
-      `추천 길: ${rn.name} (${rn.seq}). 순서: ${s.rec.evs.map(e => e.type === 'c' ? `${RAILNAME[e.rail]}쿠션 ${railPoint(e)}` : BALLNAME[objKey(e.idx)]).join(' → ')}.`,
+      `추천 길: ${rn.name}${rn.seq ? ` (${rn.seq})` : ''}. 순서: ${s.rec.evs.map(e => e.type === 'c' ? `${RAILNAME[e.rail]}쿠션 ${railPoint(e)}` : BALLNAME[objKey(e.idx)]).join(' → ')}.`,
       `겨냥: ${aimText(s.rec)}. 당점: ${tipText(s.E, s.vk)}. 힘: ${s.pw.lv}단계(${s.pw.label}), 수구 초속 약 ${s.V0.toFixed(1)}m/s. 허용 오차 ±${s.tolMM.toFixed(0)}mm.`,
       `위험: ${s.risk.kiss ? '키스 가능' : ''} ${s.risk.objHit ? '적구끼리 충돌 가능' : ''}`.trim()
     ].join('\n');
