@@ -848,7 +848,7 @@ test('E2E 54: 직접 조준에서 공을 탭하면 공은 그대로 두고 그�
   await p.mouse.move(red[0], red[1]); await p.mouse.down(); await p.mouse.up();
   assert.equal(await p.inputValue('#codeOut'), code);
   // 흰공(0.75, 0.95)에서 빨간공(1.55, 0.62) 쪽: 약 22.4°
-  const deg = parseFloat(await p.textContent('#angOut'));
+  const deg = parseFloat(await p.textContent('#angDeg'));
   assert.ok(Math.abs(deg - 22.4) < 1.5, String(deg));
   await dragPx(p, red, [red[0] + 30, red[1] + 12]);
   assert.notEqual(await p.inputValue('#codeOut'), code);
@@ -866,5 +866,60 @@ test('E2E 55: 처음 온 사람은 공을 끌어 보라는 안내를 보고, 처
   // 다시 열면 맥박 안내 없음
   await p.reload(); await p.waitForSelector('#solChips .chip:not(.skel)', { timeout: 30000 });
   assert.doesNotMatch(await p.textContent('#tableHint'), /끌어 보세요/);
+  noErr(p); await p.context().close();
+});
+test('E2E 56: 정답 가리기 중 직접 조준은 추천 길이 아니라 빨간공 가운데에서 시작, 미세 조준 +는 오른쪽(시계 방향)이고 다이아몬드로 표시', async () => {
+  const p = await open();
+  const route = (await p.textContent('#solDetail .route')).trim();
+  assert.ok(route.length > 0);
+  // 가리지 않으면 1번 길로 시작
+  await p.click('#mAim');
+  assert.ok((await p.textContent('#aimTable')).includes(route));
+  await p.click('#mRec'); await p.check('#hideIn'); await p.click('#mAim');
+  assert.ok(!(await p.textContent('#aimTable')).includes(route), '정답 가리기 중에는 추천 길이 보이면 안 됨');
+  assert.equal(await p.textContent('#tipCap'), '중상단 가운데');
+  // 흰공(0.75, 0.95)에서 빨간공(1.55, 0.62) 가운데: 약 22.4°
+  const d0 = parseFloat(await p.textContent('#angDeg'));
+  assert.ok(Math.abs(d0 - 22.4) < 0.2, String(d0));
+  await p.$eval('.nudge button[data-d="0.5"]', b => b.click());
+  const d1 = parseFloat(await p.textContent('#angDeg'));
+  assert.ok(Math.abs(d1 - (d0 - 0.5)) < 0.06, `${d0} → ${d1}`);
+  assert.match(await p.textContent('#angOut'), /다이아몬드 \d\.\d/);
+  noErr(p); await p.context().close();
+});
+test('E2E 57: 당점 고르기 — 미스큐 당점은 없고, 화살표 키로 허용된 당점만 고름', async () => {
+  const p = await open();
+  await p.click('#mAim');
+  // 7 x 4 = 28점 중 ±3팁 상단·하단 4점은 뺌 (+ 공 테두리 원 1개)
+  assert.equal(await p.$$eval('#tipSvg circle', c => c.length), 1 + 24);
+  assert.equal(await p.getAttribute('#tipSvg', 'role'), 'slider');
+  await p.focus('#tipSvg');
+  const val = () => p.getAttribute('#tipSvg', 'aria-valuetext');
+  const press = async (k, n) => { for (let i = 0; i < n; i++) { await p.keyboard.press(k); assert.doesNotMatch(await val(), /3팁 · (상단|하단)/); } };
+  // 위로 끝까지 → 오른쪽 끝까지: 상단이면 2팁에서 멈추고, 3팁이면 중상단에서 멈춤
+  await press('ArrowUp', 4); await press('ArrowRight', 7);
+  assert.match(await val(), /^오른쪽 (2팁 · 상단|3팁 · 중상단)$/);
+  // 한 칸 내려 오른쪽 끝, 아래로 끝까지: 3팁은 하단이 없으므로 중단
+  await press('ArrowDown', 1); await press('ArrowRight', 7); await press('ArrowDown', 4);
+  assert.equal(await val(), '오른쪽 3팁 · 중단');
+  await press('ArrowLeft', 1); await press('ArrowDown', 1);
+  assert.equal(await val(), '오른쪽 2팁 · 하단');
+  assert.equal(await p.textContent('#tipCap'), await val());
+  noErr(p); await p.context().close();
+});
+test('E2E 58: 시스템 표 — 다이아몬드·쿠션·모양 열, 3팁은 중상단, 가로로 눕힌 휴대폰(800x360)에서 당구대가 표를 덮지 않음', async () => {
+  const p = await open();
+  await p.click('#mSys');
+  const head = await p.textContent('#sysTable tr:first-child');
+  assert.match(head, /1쿠션 다이아몬드/); assert.match(head, /모양/);
+  assert.match(await p.textContent('#sysTable tr[data-k="0"]'), /쿠션 \d\.\d/);
+  await p.click('#sysTip [data-v="3"]');
+  assert.match(await p.textContent('#sysNote'), /3팁 · 중상단/);
+  await p.setViewportSize({ width: 800, height: 360 }); await p.waitForTimeout(150);
+  for (const k of ['0', '8']) {
+    await p.$eval(`#sysTable tr[data-k="${k}"]`, e => e.scrollIntoView({ block: 'center' }));
+    const hit = await p.$eval(`#sysTable tr[data-k="${k}"]`, tr => { const r = tr.getBoundingClientRect(); return tr.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)); });
+    assert.ok(hit, `${k}번 줄이 가려짐`);
+  }
   noErr(p); await p.context().close();
 });
