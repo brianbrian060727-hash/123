@@ -219,6 +219,12 @@ test('E2E 20: 꿀팁 찾기', async () => {
   await p.fill('#tipQ', '키스');
   const vis = await p.$$eval('#tipList details.tip', d => d.filter(x => !x.hidden).length);
   assert.ok(vis >= 1 && vis < 7);
+  // 현장 말로 찾아도 표준 말 항목이 나옴
+  await p.fill('#tipQ', '우라');
+  assert.equal(await p.isVisible('#tipNone'), false);
+  const hits = await p.$$eval('#tipList dt', d => d.filter(x => x.offsetParent).map(x => x.textContent));
+  assert.ok(hits.includes('현장 말 ↔ 표준 말'), JSON.stringify(hits));
+  assert.ok(hits.some(t => t.startsWith('돌리기')), JSON.stringify(hits));
   await p.fill('#tipQ', 'zzzz없는말'); assert.equal(await p.isVisible('#tipNone'), true);
   noErr(p); await p.context().close();
 });
@@ -1329,5 +1335,30 @@ test('E2E 70: 4구 하우스 룰 — 4구에서만 보이는 옵션, 마무리 3
   await p.click('#scStart');
   assert.equal(await p.isVisible('#scFoul'), false);
   assert.equal(await p.textContent('#scHit'), '+1 득점');
+  noErr(p); await p.context().close();
+});
+test('E2E 71: 파이브앤하프 그림 — 코너 50이면 굴린 길과 앱 계산, 다른 수구는 안내만, 시스템 표로 보기', async () => {
+  const p = await open({ hash: '#tips', noWait: true, w: 360 });
+  await p.fill('#fhCue', '50'); await p.fill('#fhArr', '20');
+  assert.equal(await p.textContent('#fhOut'), '30');
+  const pts = await p.$eval('#fhSvg polyline.fh-path', e => e.getAttribute('points').trim().split(/\s+/).map(s => s.split(',').map(Number)));
+  assert.equal(pts.length, 4); // 수구 → 1·2·3쿠션
+  assert.ok(pts[1][1] < pts[0][1] && pts[3][1] > pts[2][1], JSON.stringify(pts)); // 위 장쿠션 갔다가 아래 장쿠션으로
+  const m = (await p.textContent('#fhApp')).match(/^앱 계산: 코너 50 → 30 겨냥 → 3쿠션 (\d+) \(시스템 20\)$/);
+  assert.ok(m && +m[1] >= 14 && +m[1] <= 26, await p.textContent('#fhApp'));
+  // 위·아래 장쿠션 숫자와 코너 표시
+  const txt = await p.$$eval('#fhSvg text', e => e.map(x => x.textContent));
+  for (const w of ['1쿠션 수', '3쿠션 수', '수구 수', '(코너=50)']) assert.ok(txt.includes(w), w);
+  assert.equal(txt.filter(t => t === '80').length, 2);
+  // 다른 수구 값이면 길은 그리지 않고 안내
+  await p.fill('#fhCue', '45');
+  assert.equal(await p.$$eval('#fhSvg polyline', e => e.length), 0);
+  assert.equal(await p.textContent('#fhApp'), '그림 경로는 코너 50일 때만 계산해요');
+  // 내 수구 자리로 시스템 표
+  await p.click('#fhSys');
+  assert.equal(await p.isVisible('#tabFind'), true); assert.equal(await p.isVisible('#tabTips'), false);
+  assert.equal(await p.getAttribute('#mSys', 'aria-pressed'), 'true');
+  assert.equal(await p.isVisible('#sysPanel'), true);
+  assert.equal(await p.$$eval('#sysTable tr[data-k]', e => e.length), 17);
   noErr(p); await p.context().close();
 });

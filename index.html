@@ -339,6 +339,13 @@ details.tip dd { margin: 0 0 4px; color: var(--muted); }
 .field input { width: 100px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-family: var(--f-num); font-size: 18px; color: var(--ink); }
 .calc .op { font-family: var(--f-num); font-size: 20px; color: var(--muted); padding-bottom: 8px; }
 .calc-out { font-family: var(--f-display); font-size: 40px; line-height: 1; color: var(--accent); padding-bottom: 2px; }
+/* 파이브앤하프 숫자 자리 그림 (글자 크기는 viewBox 단위) */
+.fh-svg { display: block; width: 100%; max-width: 480px; height: auto; }
+#fhNote, #fhApp { margin: 0; }
+.fh-svg text { font-family: var(--f-num); font-size: 10px; fill: var(--muted); }
+.fh-svg .t { font-family: var(--f-body); font-weight: 600; }
+.fh-svg .hi { fill: var(--accent); font-weight: 700; }
+.fh-svg .hi2 { fill: var(--brass); font-weight: 700; }
 .note { font-size: 12.5px; color: var(--muted); margin: 0; max-width: 65ch; }
 /* 마지막 줄에 한 단어만 남지 않게 */
 .hint, .note, .tipbox, details.tip li { text-wrap: pretty; }
@@ -757,33 +764,36 @@ details.settings { box-shadow: var(--shadow); }
         <div class="field">1쿠션 겨냥<span class="calc-out" id="fhOut">30</span></div>
       </div>
       <p class="sub" id="fhNote"></p>
+      <svg id="fhSvg" class="fh-svg" viewBox="0 0 300 160" role="img" aria-label="파이브앤하프 숫자 자리: 위 장쿠션은 1쿠션 수, 아래 장쿠션은 3쿠션 수(둘 다 왼쪽 코너부터 다이아몬드마다 10), 오른쪽 아래 코너는 수구 수 50"></svg>
+      <p class="sub" id="fhApp"></p>
+      <div class="row-inline"><button type="button" class="btn" id="fhSys">당구대에서 시스템 표로 보기</button><span class="sub">내 수구 자리로 굴려 봐요. 앱 포인트 = 시스템 수 ÷ 10</span></div>
       <div class="tipbox">
         <div><b>기준</b>코너에서 출발하는 수구 수가 50입니다. 코너 50에서 1쿠션 30을 겨냥하면 3쿠션 20에 도착하는 것이 기준 샷이에요.</div>
-        <div><b>당점</b>시스템 수치는 보통 상단 회전 2~3팁, 부드러운 중간 힘을 기준으로 합니다. 당점과 힘을 매번 같게 해야 수치가 맞아요.</div>
+        <div><b>당점</b>시스템 수치는 보통 중상단~상단 당점에 진행 방향 회전 2~3팁, 부드러운 중간 힘이 기준이에요. 1쿠션 수는 공이 닿는 쿠션 자리가 아니라 레일 위 다이아몬드를 보고 겨냥하는 수입니다.</div>
         <div><b>보정</b>구장마다 쿠션과 천 상태가 달라 같은 수로 쳐도 도착점이 밀립니다. 코너 50 기준 샷을 몇 번 쳐서 도착점이 어디로 가는지 보고, 그만큼 더하거나 빼서 쓰세요.</div>
       </div>
     </div>
 
     <div class="panel">
       <div class="panel-head"><h2>꿀팁 모음</h2><span class="sub">동호인들이 자주 묻는 것 위주</span></div>
-      <div class="tip-search"><input class="text-in" id="tipQ" type="search" placeholder="찾기: 키스, 끌어치기, 하이런…" aria-label="꿀팁 찾기"></div>
+      <div class="tip-search"><input class="text-in" id="tipQ" type="search" placeholder="찾기: 키스, 우라, 하꼬, 끌어치기…" aria-label="꿀팁 찾기"></div>
       <p class="sub" id="tipNone" hidden>찾는 내용이 없어요. 다른 말로 찾아보세요.</p>
       <div id="tipList">
         <details class="tip" open><summary>두께 · 조준</summary><ul>
           <li><b>두께는 수구 중심이 아니라 가상의 공(고스트볼)으로 겨냥</b>하세요. 맞는 순간 수구가 놓일 자리를 그려 놓고 그 중심을 보고 칩니다.</li>
-          <li><b>옆회전을 주면 수구가 반대쪽으로 살짝 밀려 나가요(스쿼트).</b> 회전을 많이 줄수록 두께가 두꺼워지기 쉬우니 조금 더 얇게 겨냥합니다.</li>
+          <li><b>옆회전을 주면 수구가 당점 반대쪽으로 살짝 밀려 나가요(스쿼트).</b> 적구 오른쪽을 오른쪽 당점으로(왼쪽-왼쪽도 같음) 맞히면 두꺼워지고, 반대면 얇아집니다. 먼 거리에서는 커브가 일부 되돌려요.</li>
           <li><b>먼 거리에서는 회전 때문에 공이 휘어요(커브).</b> 강하게 치면 덜 휘고, 약하게 치면 더 휘어 두께가 바뀝니다.</li>
           <li>얇은 두께(1/4 이하)는 실수 폭이 좁습니다. 같은 길이 두꺼운 두께로도 나오면 그쪽을 고르세요. 앱의 허용 오차 숫자가 이걸 알려 줘요.</li>
         </ul></details>
         <details class="tip"><summary>당점 · 회전</summary><ul>
           <li><b>1팁은 공 반지름의 약 1/6.</b> 3팁이 넘어가면 미스큐가 잘 나니 초크를 꼭 칠하세요.</li>
           <li><b>상단은 밀고, 하단은 끕니다.</b> 적구를 맞힌 뒤 수구가 앞으로 따라가게 하려면 상단, 뒤로 빼려면 하단입니다. 끌어치기는 거리가 멀수록 효과가 줄어요.</li>
-          <li><b>회전은 쿠션을 맞을 때 각을 바꿉니다.</b> 오른쪽 회전이면 쿠션을 맞고 오른쪽으로 더 벌어져요. 회전이 덜 먹는 테이블이면 설정의 회전 효과를 낮추세요.</li>
+          <li><b>회전은 쿠션을 맞을 때 각을 바꿉니다.</b> 오른쪽 회전이면 쿠션을 맞고 나올 때 (치는 쪽에서 볼 때) 오른쪽으로 더 꺾여요. 진행 방향과 같은 회전(순회전)이면 각이 넓어지고, 반대 회전(역회전)이면 좁아집니다. 회전이 덜 먹는 테이블이면 설정의 회전 효과를 낮추세요.</li>
           <li>회전은 이동 거리에 따라 줄어듭니다. 3쿠션 뒤까지 회전을 살리려면 힘을 조금 더 주세요.</li>
         </ul></details>
         <details class="tip"><summary>스트로크 · 힘</summary><ul>
           <li><b>힘은 세기보다 일정함이 먼저</b>입니다. 같은 길을 같은 힘으로 10번 쳐서 도착점이 모이는지 확인하세요.</li>
-          <li>백스트로크는 천천히, 임팩트 후에는 큐를 공 지나 10~15cm 밀어 줍니다. 큐를 멈추면 회전이 덜 들어가요.</li>
+          <li>백스트로크는 천천히, 임팩트까지 큐를 가속하고 공을 지나 10~15cm 자연스럽게 밀어 줍니다. 임팩트 직전에 큐를 멈추려 하면 큐가 감속해 힘과 회전이 덜 들어가요.</li>
           <li>그립은 가볍게. 꽉 쥐면 큐 끝이 흔들려 당점이 틀어집니다.</li>
           <li>3쿠션은 대부분 중간 힘이면 충분합니다. 힘이 세면 두께 오차가 커지고 키스도 늘어요.</li>
         </ul></details>
@@ -807,13 +817,14 @@ details.settings { box-shadow: var(--shadow); }
           <dt>수구 · 1적구 · 2적구</dt><dd>내가 치는 공, 먼저 맞히는 공, 마지막에 맞혀야 하는 공.</dd>
           <dt>두께</dt><dd>수구가 적구를 얼마나 겹쳐 맞히는지. 정면이 1, 반만 겹치면 1/2 두께.</dd>
           <dt>당점 · 팁</dt><dd>큐로 수구를 치는 위치. 가운데에서 옆으로 1팁, 2팁… 하고 셉니다.</dd>
-          <dt>돌리기 (옆·앞·뒤돌리기)</dt><dd>적구를 맞힌 뒤 장쿠션-단쿠션-장쿠션으로 돌아 나오는 길. 적구의 어느 쪽을 맞히는지에 따라 앞돌리기, 뒤돌리기, 옆돌리기로 나눠 부릅니다.</dd>
-          <dt>대회전</dt><dd>테이블을 크게 한 바퀴 돌며 양쪽 단쿠션을 모두 거치는 길.</dd>
-          <dt>빗겨치기</dt><dd>적구를 얇게 맞혀 단쿠션부터 먼저 보내는 길.</dd>
+          <dt>돌리기 (옆·앞·뒤돌리기)</dt><dd>적구를 맞힌 뒤 장쿠션-단쿠션-장쿠션으로 돌아 나오는 길. 적구의 어느 쪽을 맞히는지에 따라 뒤돌리기, 앞돌리기, 옆돌리기로 나눠 부릅니다(차례로 우라·오마·하꼬).</dd>
+          <dt>대회전</dt><dd>1적구를 맞힌 뒤 장-단-장-단(또는 단-장-단-장)처럼 네 면을 차례로 거쳐 테이블을 크게 한 바퀴 도는 길.</dd>
+          <dt>비껴치기</dt><dd>적구를 얇게 맞혀 단쿠션부터 먼저 보내는 길.</dd>
           <dt>횡단샷</dt><dd>장쿠션에서 맞은편 장쿠션으로 테이블을 가로지르는 길.</dd>
-          <dt>빈쿠션 · 뱅크샷</dt><dd>적구보다 쿠션을 먼저 맞히는 샷. 쿠션 세 번을 먼저 맞히면 뱅크샷이라고 부릅니다.</dd>
+          <dt>빈쿠션 · 뱅크샷</dt><dd>적구보다 쿠션을 먼저 맞히는 샷. 먼저 맞힌 쿠션 수에 따라 원뱅크·투뱅크·쓰리뱅크라고도 해요. 프로당구(PBA)는 뱅크샷 득점을 2점으로 칩니다.</dd>
           <dt>키스</dt><dd>의도하지 않게 공끼리 다시 부딪히는 것.</dd>
           <dt>이닝 · 에버리지 · 하이런</dt><dd>한 번 차례가 온 횟수, 점수 ÷ 이닝, 한 이닝에 연속으로 낸 최고 점수.</dd>
+          <dt>현장 말 ↔ 표준 말</dt><dd>우라(우라마와시) → 뒤돌리기 · 오마시(오마와시) → 앞돌리기 · 하꼬(하코마와시) → 옆돌리기 · 니주(니주마와시) → 대회전 · 오시 → 밀어치기 · 히끼 → 끌어치기 · 나메 → 얇게치기 · 다테 → 길게치기 · 수구 → 내 공 · 적구 → 목적구 (PBA·국어문화원 당구 용어 기준)</dd>
         </dl></details>
       </div>
     </div>
@@ -3244,15 +3255,63 @@ if (typeof module !== 'undefined') module.exports = Core;
   document.querySelector('.tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.tab); });
 
   // ---------- 파이브앤하프 ----------
+  // 그림: 위 장쿠션 = 1쿠션 수, 아래 장쿠션 = 3쿠션 수(둘 다 왼쪽 코너부터 다이아몬드 × 10), 오른쪽 아래 코너 = 수구 50
+  const FH = { x0: 48, y0: 34, cw: 190, rail: 11 };
+  let fhRows = null; // 코너 50 기준 샷(단위 테스트와 같은 기하). 처음 필요할 때 한 번만 굴림
+  function fhDraw(c, a, r) {
+    const t = Engine.TABLES.daedae, { x0, y0, cw, rail } = FH, s = cw / t.W, ch = t.H * s;
+    const f = n => n.toFixed(1), ok = v => Number.isFinite(v) && v >= 0 && v <= 80;
+    const X = p => x0 + p.x * s, Y = p => y0 + (t.H - p.y) * s; // 엔진 좌표(y 위쪽) → 그림
+    const d = Engine.DIA * s, ty = y0 - d, by = y0 + ch + d; // 레일 위 다이아몬드 줄
+    const nx = v => x0 + v / 10 * (cw / 8); // 시스템 수 → 장쿠션 위치
+    const dot = (x, y, r, fill) => `<circle cx="${f(x)}" cy="${f(y)}" r="${r}" fill="${fill}"/>`;
+    let o = `<rect x="${x0 - rail}" y="${y0 - rail}" width="${f(cw + 2 * rail)}" height="${f(ch + 2 * rail)}" rx="5" fill="var(--rail)"/>`
+      + `<rect x="${x0}" y="${y0}" width="${cw}" height="${f(ch)}" fill="var(--cloth)"/>`;
+    for (let k = 1; k < 8; k++) o += dot(nx(k * 10), ty, 1.3, 'var(--pearl)') + dot(nx(k * 10), by, 1.3, 'var(--pearl)');
+    for (let k = 1; k < 4; k++) o += dot(x0 - d, y0 + k * ch / 4, 1.3, 'var(--pearl)') + dot(x0 + cw + d, y0 + k * ch / 4, 1.3, 'var(--pearl)');
+    const top = y0 - rail - 3, bot = y0 + ch + rail + 11, rx = x0 + cw + rail + 4;
+    for (let k = 0; k <= 8; k++) {
+      o += `<text x="${f(nx(k * 10))}" y="${top}" text-anchor="middle"${r === k * 10 ? ' class="hi"' : ''}>${k * 10}</text>`
+        + `<text x="${f(nx(k * 10))}" y="${f(bot)}" text-anchor="middle"${a === k * 10 ? ' class="hi2"' : ''}>${k * 10}</text>`;
+    }
+    o += `<text class="t" x="0" y="${top}">1쿠션 수</text><text class="t" x="0" y="${f(bot)}">3쿠션 수</text>`
+      + `<text class="t" x="${rx}" y="${f(y0 + ch - 6)}">수구 수</text><text class="t" x="${rx}" y="${f(y0 + ch + 6)}">(코너=50)</text>`;
+    // 겨냥할 1쿠션 다이아몬드, 도착할 3쿠션 자리
+    if (ok(r)) o += dot(nx(r), ty, 2.6, 'var(--accent)');
+    if (ok(a)) o += dot(nx(a), by, 2.6, 'var(--brass)');
+    let app = '';
+    if (c === 50 && ok(r) && Number.isInteger(r / 5)) {
+      if (!fhRows) fhRows = Engine.sysTable({ table: 'daedae', cue: { x: 2.75, y: 1.33 }, objs: [{ x: 1, y: 1 }, { x: 2, y: 0.5 }] }, { rail: 2, E: 2, auto: true });
+      // 수구에서 1쿠션 다이아몬드까지 겨냥선(점선), 3쿠션까지 굴린 길
+      const row = fhRows[r / 5], p = row.path.slice(0, 4), q = p[0];
+      const pts = p.map(e => `${f(X(e))},${f(Y(e))}`).join(' ');
+      o += `<line x1="${f(X(q))}" y1="${f(Y(q))}" x2="${f(nx(r))}" y2="${f(ty)}" stroke="var(--path)" stroke-width="0.8" stroke-dasharray="3 3" opacity="0.7"/>`
+        + `<polyline points="${pts}" fill="none" stroke="var(--path-edge)" stroke-width="3.4" stroke-linejoin="round"/>`
+        + `<polyline class="fh-path" points="${pts}" fill="none" stroke="var(--path)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`
+        + `<circle cx="${f(X(q))}" cy="${f(Y(q))}" r="3.2" fill="var(--ball-white)" stroke="var(--path-edge)" stroke-width="0.6"/>`;
+      if (row.ok && row.third.rail === 0) app = `앱 계산: 코너 50 → ${r} 겨냥 → 3쿠션 ${(row.third.pt * 10).toFixed(0)} (시스템 ${a})`;
+      else if (row.ok) app = `앱 계산: 코너 50 → ${r} 겨냥이면 3쿠션이 ${RAILSHORT[row.third.rail]}쿠션에 닿아요 (시스템 ${a})`;
+      else app = `앱 계산: 코너 50 → ${r} 겨냥은 ${row.why === 'side' ? '1쿠션이 단쿠션이에요' : '3쿠션까지 가지 않아요'}`;
+    } else if (c === 50 && ok(r)) app = '그림 경로는 1쿠션 수가 5 단위일 때만 계산해요';
+    else if (Number.isFinite(c) && c !== 50) app = '그림 경로는 코너 50일 때만 계산해요';
+    $('#fhSvg').innerHTML = o;
+    $('#fhApp').textContent = app;
+  }
   function fiveHalf() {
     const c = parseFloat($('#fhCue').value), a = parseFloat($('#fhArr').value);
-    if (!isFinite(c) || !isFinite(a)) { $('#fhOut').textContent = '–'; $('#fhNote').textContent = '두 숫자를 넣어 주세요.'; return; }
+    if (!isFinite(c) || !isFinite(a)) { $('#fhOut').textContent = '–'; $('#fhNote').textContent = '두 숫자를 넣어 주세요.'; fhDraw(NaN, NaN, NaN); return; }
     const r = Math.round((c - a) * 10) / 10;
     $('#fhOut').textContent = r;
     $('#fhNote').textContent = r < 0 ? '1쿠션 수가 0보다 작아요. 이 출발점에서는 그 도착점이 시스템 범위를 벗어납니다.'
       : `수구 ${c}에서 1쿠션 ${r}을 겨냥하면 3쿠션 ${a} 근처에 도착합니다.`;
+    fhDraw(c, a, r);
   }
   $('#fhCue').addEventListener('input', fiveHalf); $('#fhArr').addEventListener('input', fiveHalf); fiveHalf();
+  // 내 실제 수구 자리에서 굴린 시스템 표로
+  $('#fhSys').addEventListener('click', () => {
+    showTab('find'); setMode('sys');
+    $('#cvTable').scrollIntoView({ block: 'nearest', behavior: motion() });
+  });
 
   // ---------- 기록 표 (내 기록 · 클럽 기록 공용) ----------
   // 저장값·백업·공유 문서는 믿지 않고 숫자/글자로 정리해서 씀
