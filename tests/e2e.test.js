@@ -435,3 +435,28 @@ test('E2E 34: 점수판에서 붙여넣은 사진은 길 찾기에서 맞는 크
   assert.ok(Math.abs(r.cw - r.sw) < 2, JSON.stringify(r));
   noErr(p); await p.context().close();
 });
+test('E2E 35: 감싸지 않은 index.html을 휴대폰에서 바로 열어도 360px 레이아웃', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 });
+  await ctx.route('https://fonts.googleapis.com/**', r => r.abort());
+  const p = await ctx.newPage();
+  p.errors = []; p.on('pageerror', e => p.errors.push(e.message));
+  await p.goto('file://' + path.join(__dirname, '..', 'index.html'));
+  await p.waitForSelector('.chip', { timeout: 30000 });
+  assert.equal(await p.evaluate(() => window.innerWidth), 360);
+  assert.equal(await p.evaluate(() => document.characterSet), 'UTF-8');
+  assert.equal(await p.$eval('.wrap', e => e.lang), 'ko');
+  assert.equal(await p.evaluate(() => getComputedStyle(document.body).wordBreak), 'keep-all');
+  assert.deepEqual(p.errors, []);
+  await ctx.close();
+});
+test('E2E 36: 글꼴 서버가 응답하지 않아도 첫 화면과 추천 길이 뜸', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 400, height: 900 } });
+  await ctx.route('https://fonts.googleapis.com/**', () => {}); // 끝내 응답 없음
+  const p = await ctx.newPage();
+  p.errors = []; p.on('pageerror', e => p.errors.push(e.message));
+  await p.goto('file://' + page, { waitUntil: 'commit' });
+  await p.waitForSelector('.chip', { timeout: 15000 });
+  assert.ok(await p.$('link[rel="stylesheet"][href*="fonts.googleapis.com/css2"]'), '글꼴은 나중에 붙여야 함');
+  assert.deepEqual(p.errors, []);
+  await ctx.close();
+});
