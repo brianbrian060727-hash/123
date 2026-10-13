@@ -176,9 +176,11 @@ test('E2E 15: 팀전 칠 사람 표시', async () => {
 test('E2E 16: 상대 전적과 탭을 떠나면 샷 클락 멈춤', async () => {
   const p = await open({ hash: '#score', noWait: true });
   await p.click('#scClockSeg [data-v="30"]');
+  // 기본 이름(선수 A…)은 내 기록에서 빠지므로 실제 이름으로
+  const n = await p.$$('#scPlayers input[data-k="name"]'); await n[0].fill('김철수'); await n[1].fill('이영희');
   const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('1'); await t[1].fill('5');
   await p.click('#scStart'); await p.click('#scHit'); await p.click('#scMiss');
-  assert.match(await p.textContent('#scMine'), /선수 A vs 선수 B/);
+  assert.match(await p.textContent('#scMine'), /김철수 vs 이영희/);
   assert.match(await p.textContent('#scMine'), /1-0-0/);
   await p.click('#scNew'); await p.click('#scStart');
   await p.click('.tabs [data-tab="tips"]');
@@ -342,13 +344,15 @@ test('E2E 28: 클럽 기록 — 경기 끝나면 공유 기록에 올라가고 �
   await p.waitForSelector('#clubPanel:not([hidden])');
   assert.equal(await p.isVisible('#scLiveRow'), true);
   await p.check('#scLive');
+  // 기본 이름(선수 A…)은 선수별 기록에서 빠지므로 실제 이름으로
+  const n = await p.$$('#scPlayers input[data-k="name"]'); await n[0].fill('김철수'); await n[1].fill('이영희');
   const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('2'); await t[1].fill('2');
   await p.click('#scStart'); await p.click('#scHit');
   await p.waitForSelector('#clubLive .live-card');
   await p.click('#clubLive [data-watch]'); await p.waitForSelector('#clubWatch .sc-p');
   await p.click('#scHit'); await p.click('#scMiss');
-  await p.waitForFunction(() => /선수 A/.test(document.querySelector('#clubStats').textContent));
-  assert.match(await p.textContent('#clubHist'), /선수 A 승/);
+  await p.waitForFunction(() => /김철수/.test(document.querySelector('#clubStats').textContent));
+  assert.match(await p.textContent('#clubHist'), /김철수 승/);
   noErr(p); await p.context().close();
 });
 test('E2E 29: Claude 코치 설명 (흉내)', async () => {
@@ -583,6 +587,80 @@ test('E2E 42: 저장이 막힌 화면이면 경기 설정에 미리 알림', asy
   assert.match(await p.textContent('#scSetup'), /기록이 저장되지 않아요/);
   await p.click('#scStart'); await p.click('#scHit');
   assert.deepEqual(await p.$$eval('.sc-score b', e => e.map(x => x.textContent)), ['1', '0']);
+  assert.deepEqual(p.errors, []);
+  await ctx.close();
+});
+test('E2E 43: 악성 백업을 불러와도 스크립트가 돌지 않고, 망가진 기록 줄은 건너뜀', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  const bad = '<img src=x onerror=window.__x=1>';
+  const backup = { app: 'cue3', v: 1, history: [
+    { id: 'evil1', d: Date.now() - 6e4, k: '3c', n: ['김철수', bad], t: [bad, 20], s: [bad, 3], i: [bad, 5], h: [bad, 2], res: bad },
+    { d: Date.now() - 12e4, n: 'x', s: [1] }, null
+  ], roster: [{ name: '박민수', t3: '1" onfocus=window.__y=1 autofocus x="' }, { name: bad, t4: bad }, { t3: 5 }] };
+  await p.setInputFiles('#scImport', { name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)) });
+  await p.waitForFunction(() => /김철수/.test(document.querySelector('#scHist').textContent));
+  assert.match(await p.textContent('#toast'), /경기 1개 불러옴 · 2개 건너뜀/);
+  await p.click('#scRosterBox summary');
+  assert.match(await p.textContent('#scRoster'), /박민수/);
+  // 명단 이름을 고르면 점수 칸에 숫자만 들어감
+  await (await p.$$('#scPlayers input[data-k="name"]'))[0].fill('박민수');
+  await p.waitForTimeout(300);
+  assert.equal(await p.$$eval('#scHist img, #scMine img, #scRoster img, #scPlayers img', e => e.length), 0);
+  assert.equal(await p.$$eval('#scRoster [onfocus], #scPlayers [onfocus]', e => e.length), 0);
+  assert.deepEqual(await p.evaluate(() => [window.__x, window.__y]), [undefined, undefined]);
+  noErr(p); await p.context().close();
+});
+test('E2E 44: 칸이 빠진 옛 백업·망가진 저장값이어도 오류 없이 점수가 저장되고, Claude 밖에서는 백업 파일을 내려받음', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  // 이미 망가진 저장값은 읽을 때 정리
+  await p.evaluate(() => localStorage.setItem('cue3-history', JSON.stringify([{ d: Date.now(), n: ['김철수'], s: ['<img src=x onerror=window.__z=1>'], i: 'x' }, 5, { n: [] }])));
+  await p.reload(); await p.waitForSelector('#scSetup:not([hidden])');
+  await p.waitForTimeout(200);
+  assert.match(await p.textContent('#scHist'), /김철수 0\/0/);
+  assert.equal(await p.$$eval('#scHist img', e => e.length), 0);
+  assert.equal(await p.evaluate(() => window.__z), undefined);
+  await p.setInputFiles('#scImport', { name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ app: 'cue3', history: [{ d: 1, n: ['A'], s: [1] }] })) });
+  await p.waitForFunction(() => /경기 1개 불러옴/.test(document.querySelector('#toast').textContent));
+  await p.click('#scStart'); await p.click('#scHit');
+  assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('cue3-score2')).g.players[0].score), 1);
+  await p.reload(); await p.waitForSelector('#scGame:not([hidden])');
+  assert.deepEqual(await p.$$eval('.sc-score b', e => e.map(x => x.textContent)), ['1', '0']);
+  const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#scExport')]);
+  // 파일 이름은 실행 환경 로캘에 따라 'download'로 바뀔 수 있어 내용만 확인
+  const got = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+  assert.equal(got.app, 'cue3'); assert.equal(got.history.length, 2);
+  assert.match(await p.textContent('#toast'), /내려받았어요/);
+  noErr(p); await p.context().close();
+});
+test('E2E 45: 300경기를 불러온 뒤 한 경기를 끝내면 301경기, 끝난 경기 되돌리기는 그 경기만 지움', async () => {
+  const p = await open({ hash: '#score', noWait: true });
+  const now = Date.now(), history = Array.from({ length: 300 }, (_, j) => ({ id: 'old' + j, d: now - (j + 1) * 6e4, k: '3c', n: ['김철수', '이영희'], t: [20, 20], s: [20, j % 20], i: [30, 30], h: [3, 2], res: '김철수 승' }));
+  await p.setInputFiles('#scImport', { name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ app: 'cue3', v: 1, history })) });
+  await p.waitForFunction(() => /경기 300개 불러옴/.test(document.querySelector('#toast').textContent));
+  const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('1'); await t[1].fill('1');
+  await p.click('#scStart'); await p.click('#scMiss'); await p.click('#scHit');
+  assert.match(await p.textContent('#scMsg'), /경기 끝/);
+  const len = () => p.evaluate(() => JSON.parse(localStorage.getItem('cue3-history')).length);
+  assert.equal(await len(), 301);
+  await p.click('#scUndo');
+  assert.equal(await len(), 300);
+  assert.equal(await p.evaluate(() => JSON.parse(localStorage.getItem('cue3-history')).some(r => r.id === 'old0')), true);
+  noErr(p); await p.context().close();
+});
+test('E2E 46: 파일 저장·복사가 모두 막히면 백업 내용을 버튼 아래 칸에 보여 줌', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 400, height: 900 } });
+  await ctx.addInitScript(() => {
+    HTMLAnchorElement.prototype.click = function () { throw new Error('막힘'); };
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('막힘')) } });
+  });
+  const p = await ctx.newPage();
+  p.errors = []; p.on('pageerror', e => p.errors.push(e.message));
+  await p.goto('file://' + page + '#score');
+  await p.click('#scExport');
+  await p.waitForSelector('#scBackupOut', { state: 'visible' });
+  const v = await p.inputValue('#scBackupOut');
+  assert.equal(JSON.parse(v).app, 'cue3');
+  assert.equal(await p.evaluate(() => document.activeElement.id), 'scBackupOut');
   assert.deepEqual(p.errors, []);
   await ctx.close();
 });

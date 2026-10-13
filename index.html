@@ -195,6 +195,7 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
 .col { display: flex; flex-direction: column; gap: 14px; }
 .text-in { flex: 1 1 160px; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); font-size: 16px; }
 .text-in.mono { font-family: var(--f-num); font-size: 14px; }
+#scBackupOut { display: block; width: 100%; resize: vertical; color: var(--ink); }
 .row-inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .tipbox { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; display: grid; gap: 6px; }
 .tipbox b { color: var(--brass); font-weight: 700; margin-right: 4px; }
@@ -655,6 +656,10 @@ details.settings { box-shadow: var(--shadow); }
         <button type="button" class="btn sm" id="scExport">기록 백업 저장</button>
         <label class="btn sm upload" for="scImport">백업 불러오기<input type="file" id="scImport" class="file-cover" accept=".json,application/json,text/plain"></label>
         <span class="sub">휴대폰을 바꾸거나 브라우저 기록을 지워도 경기 기록을 옮길 수 있어요</span>
+      </div>
+      <div id="scBackupBox" hidden>
+        <p class="sub" style="margin:8px 0 4px">파일 저장과 복사가 막혀 있어요. 아래 내용을 길게 눌러 복사한 뒤 메모장에 붙여 넣어 .json으로 저장하세요.</p>
+        <textarea id="scBackupOut" class="text-in mono" rows="4" readonly aria-label="기록 백업 내용"></textarea>
       </div>
     </div>
     </div>
@@ -2647,38 +2652,54 @@ if (typeof module !== 'undefined') module.exports = Core;
   $('#fhCue').addEventListener('input', fiveHalf); $('#fhArr').addEventListener('input', fiveHalf); fiveHalf();
 
   // ---------- 기록 표 (내 기록 · 클럽 기록 공용) ----------
+  // 저장값·백업·공유 문서는 믿지 않고 숫자/글자로 정리해서 씀
+  const HMAX = 500;
+  const N = v => { const x = typeof v === 'number' ? v : (typeof v === 'string' && v.trim() ? +v : NaN); return Number.isFinite(x) ? x : 0; };
+  const S = (v, m = 40) => (typeof v === 'string' ? v : typeof v === 'number' && Number.isFinite(v) ? String(v) : '').slice(0, m);
+  const DEFNAME = /^선수 ([A-F]|[1-6])$/;
+  function cleanGame(r) {
+    if (!r || typeof r !== 'object' || !Array.isArray(r.n) || !r.n.length) return null;
+    const d = N(r.d); if (!(d > 0) || d > Date.now() + 864e5) return null;
+    const k = Math.min(r.n.length, 6), A = a => Array.from({ length: k }, (_, j) => N(Array.isArray(a) ? a[j] : 0));
+    return { id: typeof r.id === 'string' && /^[A-Za-z0-9_-]{1,60}$/.test(r.id) ? r.id : '', d, k: r.k === '4b' ? '4b' : '3c', n: r.n.slice(0, k).map(x => S(x, 24)),
+      t: A(r.t), s: A(r.s), i: A(r.i), h: A(r.h), res: S(r.res, 80), by: r.by ? S(r.by, 80) : undefined };
+  }
   const fmtDay = d => { const x = new Date(d); return `${x.getMonth() + 1}/${x.getDate()}`; };
   const av3 = (sc, inn) => inn > 0 ? (sc / inn).toFixed(3) : '0.000';
   function histHtml(a, empty) {
     return a.length ? `<table class="list"><tr><th>날짜</th><th>선수 · 점수</th><th class="r">이닝</th><th>결과</th></tr>${a.slice(0, 20).map(r =>
-      `<tr><td>${fmtDay(r.d)}</td><td>${r.k === '4b' ? '<span class="sub">4구</span> ' : ''}${r.n.map((n, i) => `${esc(n)} <span class="num">${r.s[i]}/${r.t[i]}</span>`).join(' · ')}</td><td class="r num">${Math.max(...r.i)}</td><td>${esc(r.res)}</td></tr>`).join('')}</table>`
+      `<tr><td>${esc(fmtDay(r.d))}</td><td>${r.k === '4b' ? '<span class="sub">4구</span> ' : ''}${r.n.map((n, i) => `${esc(n)} <span class="num">${esc(r.s[i])}/${esc(r.t[i])}</span>`).join(' · ')}</td><td class="r num">${esc(r.i.length ? Math.max(...r.i) : 0)}</td><td>${esc(r.res)}</td></tr>`).join('')}</table>`
       : `<p class="sub" style="margin:0">${empty}</p>`;
   }
+  // 기본 이름(선수 A…)은 사람이 아니라서 선수별 줄과 상대 전적에서 뺌
+  const realName = nm => !!nm && !DEFNAME.test(nm);
   function statsHtml(a, empty) {
     const by = new Map();
     for (const r of a) r.n.forEach((nm, i) => {
+      if (!realName(nm)) return;
       const k = r.k === '4b' ? `${nm} (4구)` : nm;
       const o = by.get(k) || { g: 0, s: 0, i: 0, h: 0, w: 0, recent: [] };
-      o.g++; o.s += r.s[i]; o.i += r.i[i]; o.h = Math.max(o.h, r.h[i]);
+      o.g++; o.h = Math.max(o.h, r.h[i]);
+      // 이닝이 0 이하인 줄은 에버리지 계산에서 뺌
+      if (r.i[i] > 0) { o.s += r.s[i]; o.i += r.i[i]; if (o.recent.length < 10) o.recent.push([r.s[i], r.i[i]]); }
       if (r.n.length > 1 && r.res === `${nm} 승`) o.w++;
-      if (o.recent.length < 10) o.recent.push([r.s[i], r.i[i]]);
       by.set(k, o);
     });
     const rows = [...by.entries()].sort((x, y) => y[1].g - x[1].g);
     const h2h = new Map();
-    for (const r of a) if (r.n.length === 2 && r.n[0] !== r.n[1] && r.k !== '4b') {
+    for (const r of a) if (r.n.length === 2 && r.n[0] !== r.n[1] && r.k !== '4b' && realName(r.n[0]) && realName(r.n[1])) {
       const [x, y] = [...r.n].sort(), key = x + '\u0000' + y, o = h2h.get(key) || { x, y, wx: 0, wy: 0, d: 0 };
       if (r.res === `${x} 승`) o.wx++; else if (r.res === `${y} 승`) o.wy++; else o.d++;
       h2h.set(key, o);
     }
-    const h2hHtml = h2h.size ? `<span class="lbl">상대 전적</span><table class="list"><tr><th>대결</th><th class="r">승-무-패</th></tr>${[...h2h.values()].map(o => `<tr><td>${esc(o.x)} vs ${esc(o.y)}</td><td class="r num">${o.wx}-${o.d}-${o.wy}</td></tr>`).join('')}</table>` : '';
+    const h2hHtml = h2h.size ? `<span class="lbl">상대 전적</span><table class="list"><tr><th>대결</th><th class="r">승-무-패</th></tr>${[...h2h.values()].map(o => `<tr><td>${esc(o.x)} vs ${esc(o.y)}</td><td class="r num">${esc(`${o.wx}-${o.d}-${o.wy}`)}</td></tr>`).join('')}</table>` : '';
     return rows.length ? `<table class="list"><tr><th>이름</th><th class="r">경기</th><th class="r">승</th><th class="r">전체 에버</th><th class="r">최근 10경기</th><th class="r">하이런</th></tr>${rows.map(([k, o]) => {
       const rs = o.recent.reduce((q, v) => [q[0] + v[0], q[1] + v[1]], [0, 0]);
-      return `<tr><td>${esc(k)}</td><td class="r num">${o.g}</td><td class="r num">${o.w}</td><td class="r num">${av3(o.s, o.i)}</td><td class="r num">${av3(rs[0], rs[1])}</td><td class="r num">${o.h}</td></tr>`;
+      return `<tr><td>${esc(k)}</td><td class="r num">${esc(o.g)}</td><td class="r num">${esc(o.w)}</td><td class="r num">${esc(av3(o.s, o.i))}</td><td class="r num">${esc(av3(rs[0], rs[1]))}</td><td class="r num">${esc(o.h)}</td></tr>`;
     }).join('')}</table>${h2hHtml}` : `<p class="sub" style="margin:0">${empty}</p>`;
   }
   // 점수판 → 클럽 기록 연결 고리 (클럽 기능이 켜질 때 채워짐)
-  const hooks = { onDone: null, onLive: null };
+  const hooks = { onDone: null, onLive: null, onUndoDone: null };
 
   // ---------- 점수판 ----------
   const Score = (() => {
@@ -2688,13 +2709,19 @@ if (typeof module !== 'undefined') module.exports = Core;
     const DEF = { '3c': 20, '4b': 200 };
     // 선수 명단: 이름과 종목별 점수(핸디)
     const RKEY = 'cue3-roster';
-    const roster = () => { try { const a = JSON.parse(localStorage.getItem(RKEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+    const cleanRoster = r => r && typeof r === 'object' ? { name: S(r.name, 12).trim(), t3: N(r.t3) || undefined, t4: N(r.t4) || undefined } : null;
+    const roster = () => { try { const a = JSON.parse(localStorage.getItem(RKEY) || '[]'); return Array.isArray(a) ? a.map(cleanRoster).filter(r => r && r.name) : []; } catch (e) { return []; } };
     const storeRoster = a => { try { localStorage.setItem(RKEY, JSON.stringify(a.slice(0, 100))); } catch (e) { /* 무시 */ } };
     const rosterFind = n => roster().find(r => r.name === String(n).trim());
     let g = null, undo = [];
     try {
       const v = JSON.parse(localStorage.getItem(KEY) || 'null');
-      if (v && v.cfg && Array.isArray(v.cfg.players) && v.cfg.players.length) cfg = Object.assign(cfg, v.cfg);
+      if (v && v.cfg && Array.isArray(v.cfg.players) && v.cfg.players.length) {
+        cfg = Object.assign(cfg, v.cfg);
+        // 저장값이 망가져도 입력 칸 속성 밖으로 새지 않게 이름·점수를 다시 정리
+        cfg.type = cfg.type === '4b' ? '4b' : '3c';
+        cfg.players = cfg.players.slice(0, 6).map(p => ({ name: S(p && p.name, 24), target: parseInt(p && p.target, 10) || DEF[cfg.type] }));
+      }
       if (v && v.g && Array.isArray(v.g.players)) {
         g = v.g;
         if (Array.isArray(v.undo)) undo = v.undo.filter(x => typeof x === 'string').slice(-50);
@@ -2704,7 +2731,8 @@ if (typeof module !== 'undefined') module.exports = Core;
     // 저장이 막힌 화면이면 경기 설정 위에 미리 알림
     try { localStorage.setItem('cue3-t', '1'); localStorage.removeItem('cue3-t'); }
     catch (e) { $('#scSetup .panel-head').insertAdjacentHTML('afterend', "<p class='hint' id='scNoStore'>이 화면에서는 기록이 저장되지 않아요. 경기가 끝나면 '결과 복사'를 눌러 두세요.</p>"); }
-    const hist = () => { try { const a = JSON.parse(localStorage.getItem(HKEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+    // 이미 망가진 저장값도 읽을 때 정리
+    const hist = () => { try { const a = JSON.parse(localStorage.getItem(HKEY) || '[]'); return Array.isArray(a) ? a.map(cleanGame).filter(Boolean) : []; } catch (e) { return []; } };
     const fmtAvg = p => SC.avg(p).toFixed(3);
     const who = i => g.team ? `${g.players[i].name.split(/[,·/]/)[0].trim()}팀 ${SC.shooter(g.players[i])}` : g.players[i].name;
     const msg = t => { const m = $('#scMsg'); m.hidden = !t; m.textContent = t || ''; };
@@ -2829,7 +2857,7 @@ if (typeof module !== 'undefined') module.exports = Core;
       const ro = roster();
       $('#rosterNames').innerHTML = ro.map(r => `<option value="${esc(r.name)}"></option>`).join('');
       $('#scRosterCount').textContent = ro.length ? `${ro.length}명` : '';
-      $('#scRoster').innerHTML = ro.length ? `<table class="list"><tr><th>이름</th><th class="r">3쿠션</th><th class="r">4구</th><th></th></tr>${ro.map((r, i) => `<tr><td>${esc(r.name)}</td><td class="r num">${r.t3 || '-'}</td><td class="r num">${r.t4 || '-'}</td><td class="r"><button type="button" class="mini del" data-rdel="${i}" aria-label="${esc(r.name)} 명단에서 빼기">빼기</button></td></tr>`).join('')}</table>`
+      $('#scRoster').innerHTML = ro.length ? `<table class="list"><tr><th>이름</th><th class="r">3쿠션</th><th class="r">4구</th><th></th></tr>${ro.map((r, i) => `<tr><td>${esc(r.name)}</td><td class="r num">${esc(r.t3 || '-')}</td><td class="r num">${esc(r.t4 || '-')}</td><td class="r"><button type="button" class="mini del" data-rdel="${i}" aria-label="${esc(r.name)} 명단에서 빼기">빼기</button></td></tr>`).join('')}</table>`
         : '<p class="sub" style="margin:0 0 12px">아직 없어요. 이름과 점수를 적고 \'이 선수들 명단에 저장\'을 누르세요.</p>';
       renderKeyInfo();
       $('#scCount').textContent = cfg.players.length;
@@ -2837,7 +2865,7 @@ if (typeof module !== 'undefined') module.exports = Core;
       $('#scPlus').disabled = cfg.players.length >= 6;
       $('#scPlayers').innerHTML = cfg.players.map((p, i) => `<div class="pl-row"><span class="idx">${i + 1}</span>
         <input class="text-in" type="text" maxlength="12" list="rosterNames" autocomplete="off" data-i="${i}" data-k="name" value="${esc(p.name)}" aria-label="${i + 1}번 선수 이름">
-        <input class="num-in" type="number" inputmode="numeric" min="1" max="${cfg.type === '4b' ? 5000 : 500}" step="${cfg.type === '4b' ? 10 : 1}" data-i="${i}" data-k="target" value="${p.target}" aria-label="${i + 1}번 선수 목표 점수"></div>`).join('');
+        <input class="num-in" type="number" inputmode="numeric" min="1" max="${cfg.type === '4b' ? 5000 : 500}" step="${cfg.type === '4b' ? 10 : 1}" data-i="${i}" data-k="target" value="${esc(p.target)}" aria-label="${i + 1}번 선수 목표 점수"></div>`).join('');
       $('#scLimit').value = cfg.limit;
       $('#scVoice').checked = !!cfg.voice;
       $('#scTeam').checked = !!cfg.team;
@@ -2852,7 +2880,7 @@ if (typeof module !== 'undefined') module.exports = Core;
       // 명단에 있는 이름이면 그 사람 점수 자동 입력
       if (t.dataset.k === 'name') {
         const r = rosterFind(t.value), v = r && (cfg.type === '4b' ? r.t4 : r.t3);
-        if (v) { cfg.players[i].target = v; const box = t.parentElement.querySelector('[data-k="target"]'); if (box) box.value = v; }
+        if (v) { cfg.players[i].target = +v || DEF[cfg.type]; const box = t.parentElement.querySelector('[data-k="target"]'); if (box) box.value = cfg.players[i].target; }
       }
       save();
     });
@@ -2921,11 +2949,13 @@ if (typeof module !== 'undefined') module.exports = Core;
       const res = SC.result(g);
       msg(`경기 끝 · ${res}`); say(`경기 끝, ${res}`);
       const a = hist();
-      const rec = { id: g.id || Date.now().toString(36), d: Date.now(), k: g.kind || '3c', n: g.players.map(p => p.name), t: g.players.map(p => p.target), s: g.players.map(p => p.score), i: g.players.map(p => p.inn), h: g.players.map(p => p.high), res };
+      // 되돌리기에서 이 경기를 찾을 수 있게 id를 경기에도 남김
+      if (!g.id) g.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      const rec = { id: g.id, d: Date.now(), k: g.kind || '3c', n: g.players.map(p => p.name), t: g.players.map(p => p.target), s: g.players.map(p => p.score), i: g.players.map(p => p.inn), h: g.players.map(p => p.high), res };
       a.unshift(rec);
       if (hooks.onDone) hooks.onDone(rec);
-      try { localStorage.setItem(HKEY, JSON.stringify(a.slice(0, 200))); } catch (e) { /* 무시 */ }
-      keepAwake(false); render(); clockReset();
+      try { localStorage.setItem(HKEY, JSON.stringify(a.slice(0, HMAX))); } catch (e) { /* 무시 */ }
+      keepAwake(false); render(); clockReset(); renderHist();
     }
     $('#scHit').addEventListener('click', () => {
       if (!g || g.done) return; snap(); buzz(18);
@@ -2936,8 +2966,16 @@ if (typeof module !== 'undefined') module.exports = Core;
     $('#scMiss').addEventListener('click', () => { if (!g || g.done) return; snap(); const prev = g.turn; SC.miss(g); afterMove(prev); });
     $('#scUndo').addEventListener('click', () => {
       const v = undo.pop(); if (!v) return;
-      if (g && g.done) { const a = hist(); a.shift(); try { localStorage.setItem(HKEY, JSON.stringify(a)); } catch (e) { /* 무시 */ } keepAwake(true); }
+      // 끝난 경기를 되돌리면 그 경기 기록만 지움(맨 앞 기록이 아닐 수도 있음)
+      const wasDone = !!(g && g.done), doneId = wasDone ? g.id : null;
+      if (wasDone) {
+        const a = doneId ? hist().filter(r => r.id !== doneId) : hist().slice(1); // id 없는 옛 경기는 맨 앞 기록
+        try { localStorage.setItem(HKEY, JSON.stringify(a.slice(0, HMAX))); } catch (e) { /* 무시 */ }
+        if (doneId && hooks.onUndoDone) hooks.onUndoDone(doneId);
+        keepAwake(true);
+      }
       g = JSON.parse(v); msg(g.closing ? '목표 도달 후 같은 이닝 진행 중이에요.' : ''); render(); clockReset();
+      if (wasDone) renderHist();
     });
     $('#scNew').addEventListener('click', e => {
       const b = e.currentTarget;
@@ -2949,7 +2987,7 @@ if (typeof module !== 'undefined') module.exports = Core;
       delete b.dataset.armed; b.textContent = '새 경기';
       newGame();
     });
-    const newGame = () => { g = null; undo = []; clearInterval(clk.timer); clk.timer = 0; clk.hold = null; keepAwake(false); setFocus(false); msg(''); prevScores = []; render(); window.scrollTo(0, 0); };
+    const newGame = () => { g = null; undo = []; clearInterval(clk.timer); clk.timer = 0; clk.hold = null; keepAwake(false); setFocus(false); msg(''); prevScores = []; render(); renderHist(); window.scrollTo(0, 0); };
     function setFocus(on) {
       document.body.classList.toggle('focus', on);
       $('#scBig').textContent = on ? '작은 화면' : '큰 화면';
@@ -2975,7 +3013,10 @@ if (typeof module !== 'undefined') module.exports = Core;
     const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { /* 무시 */ } };
     function render() {
       $('#scSetup').hidden = !!g; $('#scGame').hidden = !g;
-      if (!g) { renderSetup(); renderHist(); save(); return; }
+      // 저장 먼저: 아래 화면 그리기가 실패해도 점수는 남음
+      save();
+      if (!g) { renderSetup(); return; }
+      if (hooks.onLive && cfg.live) hooks.onLive(g);
       const solo = g.players.length === 1;
       $('#scTitle').textContent = (g.kind === '4b' ? '4구 · ' : '') + (solo ? '혼자 연습' : g.team ? `${g.players.length}팀 팀전` : `${g.players.length}인 경기`);
       const cur = g.players[g.turn];
@@ -3010,26 +3051,49 @@ if (typeof module !== 'undefined') module.exports = Core;
         h += `<td class="r num"><b>${p.score}</b></td></tr>`;
       });
       $('#scLog').innerHTML = h + '</table>';
-      renderHist(); save();
-      if (hooks.onLive && cfg.live) hooks.onLive(g);
     }
+    // 기록 표는 기록이 바뀔 때만 다시 그림(득점마다 그리지 않음)
     function renderHist() {
-      const a = hist();
-      $('#scHist').innerHTML = histHtml(a, '끝난 경기가 여기에 쌓여요.');
-      $('#scMine').innerHTML = statsHtml(a, '경기를 끝내면 이름별 에버리지와 하이런이 정리돼요.');
+      try {
+        const a = hist();
+        $('#scHist').innerHTML = histHtml(a, '끝난 경기가 여기에 쌓여요.');
+        $('#scMine').innerHTML = statsHtml(a, a.length ? '선수 A 같은 기본 이름은 빼고 정리해요. 이름을 적고 경기해 보세요.' : '경기를 끝내면 이름별 에버리지와 하이런이 정리돼요.');
+      } catch (e) {
+        $('#scHist').innerHTML = '<p class="sub" style="margin:0">기록을 표시하지 못했어요. 백업 저장 후 기록 지우기를 해 보세요.</p>';
+        $('#scMine').innerHTML = '';
+      }
     }
     // 백업: 파일 저장(뷰어가 허락하면) → 안 되면 복사 → 그래도 안 되면 화면에 표시
     async function exportBackup() {
       const data = JSON.stringify({ app: 'cue3', v: 1, at: Date.now(), history: hist(), roster: roster() });
       const d = new Date(), name = `3쿠션-기록-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.json`;
+      $('#scBackupBox').hidden = true;
       let dl = null;
       try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
       if (dl) {
         try { const r = await dl.save({ filename: name, data }); if (r && r.status === 'saved') toast('백업 파일을 저장했어요.', 'info'); return; }
-        catch (e) { if (e && e.code === 'cancelled') return; }
+        catch (e) {
+          if (e && e.code === 'declined') return; // 사용자가 거절함
+          if (e && e.code === 'rate_limited') { toast('저장 창이 이미 열려 있어요.', 'info'); return; }
+        }
+      }
+      // Claude 밖에서 연 파일이면 브라우저 내려받기
+      if (!window.claude) {
+        try {
+          const url = URL.createObjectURL(new Blob([data], { type: 'application/json' })), a = document.createElement('a');
+          a.href = url; a.download = name; a.hidden = true; document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 30e3);
+          toast('백업 파일을 내려받았어요.', 'info'); return;
+        } catch (e) { /* 아래 */ }
       }
       try { await navigator.clipboard.writeText(data); toast('파일 저장을 쓸 수 없어 백업 내용을 복사했어요. 메모장에 붙여 넣어 .json으로 저장하세요.', 'info'); }
-      catch (e) { msg('아래 내용을 길게 눌러 복사해 두세요:\n' + data); }
+      catch (e) {
+        // 마지막 수단: 백업 버튼 바로 아래에 내용을 보여 주고 선택해 둠
+        const box = $('#scBackupBox'), out = $('#scBackupOut');
+        out.value = data; box.hidden = false;
+        try { out.focus({ preventScroll: true }); out.select(); } catch (err) { /* 무시 */ }
+        box.scrollIntoView({ block: 'nearest' });
+      }
     }
     $('#scExport').addEventListener('click', exportBackup);
     $('#scImport').addEventListener('change', async e => {
@@ -3037,14 +3101,23 @@ if (typeof module !== 'undefined') module.exports = Core;
       try {
         const v = JSON.parse(await f.text());
         if (!v || v.app !== 'cue3' || !Array.isArray(v.history)) throw new Error('format');
-        const a = hist(), seen = new Set(a.map(r => r.d + '|' + r.n.join(',')));
-        let n = 0;
-        for (const r of v.history) if (r && Array.isArray(r.n) && Array.isArray(r.s) && !seen.has(r.d + '|' + r.n.join(','))) { a.push(r); n++; }
+        const a = hist(), key = r => r.d + '|' + r.n.join(','), seen = new Set(a.map(key));
+        let n = 0, skip = 0;
+        for (const raw of v.history) {
+          const r = cleanGame(raw); if (!r) { skip++; continue; }
+          if (seen.has(key(r))) continue;
+          seen.add(key(r)); a.push(r); n++;
+        }
         a.sort((x, y) => y.d - x.d);
-        localStorage.setItem(HKEY, JSON.stringify(a.slice(0, 500)));
-        if (Array.isArray(v.roster)) { const ro = roster(); for (const r of v.roster) if (r && r.name && !ro.find(x => x.name === r.name)) ro.push(r); storeRoster(ro); }
+        const trimmed = a.length > HMAX;
+        localStorage.setItem(HKEY, JSON.stringify(a.slice(0, HMAX)));
+        if (Array.isArray(v.roster)) {
+          const ro = roster();
+          for (const r of v.roster.map(cleanRoster)) if (r && r.name && !ro.find(x => x.name === r.name)) ro.push(r);
+          storeRoster(ro);
+        }
         renderHist(); renderSetup();
-        toast(`경기 ${n}개를 불러왔어요.`, 'info');
+        toast(`경기 ${n}개 불러옴${skip ? ` · ${skip}개 건너뜀` : ''}${trimmed ? ' · 최근 500경기만 보관돼요' : ''}`, 'info');
       } catch (err) { toast('3쿠션 길잡이 백업 파일이 아니에요. 기록 백업 저장으로 만든 파일을 골라 주세요.', 'warn'); }
       e.target.value = '';
     });
@@ -3121,6 +3194,7 @@ if (typeof module !== 'undefined') module.exports = Core;
       if (!e.repeat) $(id).click(); // 꾹 누르면 한 번만(반복 키는 화면 스크롤만 막음)
     });
     if (g && g.done) msg(`지난 경기 결과 · ${SC.result(g)}`);
+    renderHist();
     return {
       localHistory: () => hist(),
       render: () => {
