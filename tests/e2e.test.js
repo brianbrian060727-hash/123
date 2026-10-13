@@ -342,7 +342,8 @@ test('E2E 27: 기록 백업 저장 → 다른 기기에서 불러오기', async 
   await q.setInputFiles('#scImport', { name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(saved.data) });
   await q.waitForFunction(() => /선수 B/.test(document.querySelector('#scHist').textContent));
   await q.setInputFiles('#scImport', { name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"hello":1}') });
-  assert.match(await q.textContent('#toast'), /백업 파일이 아니에요/);
+  // 파일 읽기는 비동기라 안내가 뜰 때까지 기다림
+  await q.waitForFunction(() => /백업 파일이 아니에요/.test(document.querySelector('#toast').textContent));
   noErr(q); await q.context().close();
 });
 test('E2E 28: 클럽 기록 — 경기 끝나면 공유 기록에 올라가고 실시간 중계가 보임', async () => {
@@ -774,5 +775,96 @@ test('E2E 50: 클럽 기록을 못 올리면 알려 주고, 이 기기 기록 �
   await p.waitForFunction(() => /1개 올림/.test(document.querySelector('#toast').textContent));
   assert.deepEqual(await p.evaluate(() => JSON.parse(localStorage.getItem('cue3-club-pending'))), []);
   assert.equal(await p.evaluate(id => window.__store.has('club/main/games/' + id), pend[0]), true);
+  noErr(p); await p.context().close();
+});
+
+// 공 놓기·되돌리기 조작
+const BR = 0.03075;
+async function tablePx(p, x, y, W = 2.844) {
+  await p.$eval('#cvTable', c => c.scrollIntoView({ block: 'center' }));
+  const box = await p.$eval('#cvTable', c => { const r = c.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width }; });
+  const s = box.w / (W + 0.3);
+  return [box.x + (0.15 + x) * s, box.y + (0.15 + y) * s];
+}
+async function dragPx(p, from, to) {
+  await p.mouse.move(from[0], from[1]); await p.mouse.down();
+  await p.mouse.move(to[0], to[1], { steps: 6 }); await p.mouse.up();
+}
+const layoutLS = p => p.evaluate(() => JSON.parse(localStorage.getItem('cue3-layout') || 'null'));
+test('E2E 51: 공을 누르기만 하고 떼면 다시 계산하지 않고 고른 길이 그대로', async () => {
+  const p = await open();
+  await p.click('#solChips .chip[data-i="1"]');
+  const code = await p.inputValue('#codeOut');
+  const [x, y] = await tablePx(p, 0.75, 0.95);
+  await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.up();
+  const r = await p.evaluate(() => ({
+    busy: document.querySelector('#status').textContent.includes('계산 중'),
+    sel: document.querySelector('#solChips .chip[aria-pressed="true"]').dataset.i,
+    skel: document.querySelectorAll('#solChips .chip.skel').length
+  }));
+  assert.deepEqual(r, { busy: false, sel: '1', skel: 0 });
+  assert.equal(await p.inputValue('#codeOut'), code);
+  assert.equal(await p.isDisabled('#btnUndo'), true);
+  noErr(p); await p.context().close();
+});
+test('E2E 52: 대대 끝으로 옮긴 공은 중대로 바꾼 뒤 되돌려도 판 안에 남고, 다시 열어도 그대로', async () => {
+  const p = await open();
+  await dragPx(p, await tablePx(p, 2.35, 1.15), await tablePx(p, 2.83, 1.15));
+  assert.ok((await layoutLS(p)).balls.yellow.x > 2.79);
+  await dragPx(p, await tablePx(p, 0.75, 0.95), await tablePx(p, 0.95, 0.85));
+  await p.$eval('#segTable [data-v="jungdae"]', b => b.click());
+  await p.click('#btnUndo');
+  const inside = L => ['white', 'yellow', 'red'].every(k => L.balls[k].x >= BR - 1e-9 && L.balls[k].x <= 2.54 - BR + 1e-9 && L.balls[k].y >= BR - 1e-9 && L.balls[k].y <= 1.27 - BR + 1e-9);
+  const L = await layoutLS(p);
+  assert.equal(L.table, 'jungdae');
+  assert.ok(inside(L), JSON.stringify(L));
+  assert.ok(L.balls.yellow.x > 2.4, '되돌린 노란공은 오른쪽 끝 근처');
+  // 판 밖 값이 저장돼 있어도 시작할 때 바로잡음
+  await p.evaluate(() => localStorage.setItem('cue3-layout', JSON.stringify({ table: 'jungdae', balls: { white: { x: 0.75, y: 0.95 }, yellow: { x: 2.78, y: 1.30 }, red: { x: 2.50, y: 1.20 } } })));
+  await p.reload(); await p.waitForFunction(() => !document.querySelector('#status').textContent.includes('계산 중'), null, { timeout: 30000 });
+  const m = (await p.inputValue('#codeOut')).match(/^3C-J-W-(\d{4})-(\d{4})-(\d{4})-(\d{4})-(\d{4})-(\d{4})$/);
+  assert.ok(m, await p.inputValue('#codeOut'));
+  const v = m.slice(1).map(n => +n / 1000);
+  assert.ok(v[2] <= 2.54 - BR + 0.001 && v[3] <= 1.27 - BR + 0.001, String(v));
+  assert.ok(Math.hypot(v[2] - v[4], v[3] - v[5]) >= 2 * BR, '저장값에서 겹친 공도 떨어뜨림');
+  noErr(p); await p.context().close();
+});
+test('E2E 53: 레일 가까운 빨간공 위로 흰공을 끌어도 겹치지 않음', async () => {
+  const p = await open();
+  await p.evaluate(() => { document.querySelector('#codeIn').value = '3C-D-W-0750-0950-2350-1150-1000-0075'; document.querySelector('#btnLoadCode').click(); });
+  await p.waitForSelector('#solChips .chip:not(.skel)', { timeout: 30000 });
+  await dragPx(p, await tablePx(p, 0.75, 0.95), await tablePx(p, 1.0, 0.0));
+  const L = await layoutLS(p), w = L.balls.white, r = L.balls.red;
+  assert.ok(Math.hypot(w.x - r.x, w.y - r.y) >= 2 * BR, JSON.stringify(L));
+  assert.ok(w.y >= BR - 1e-9 && w.x >= BR && w.x <= 2.844 - BR, JSON.stringify(w));
+  assert.ok(Math.abs(r.x - 1.0) < 1e-9 && Math.abs(r.y - 0.075) < 1e-9, '빨간공은 제자리');
+  noErr(p); await p.context().close();
+});
+test('E2E 54: 직접 조준에서 공을 탭하면 공은 그대로 두고 그쪽을 겨냥, 6px 넘게 끌면 공이 움직임', async () => {
+  const p = await open();
+  await p.click('#mAim');
+  const code = await p.inputValue('#codeOut');
+  const red = await tablePx(p, 1.55, 0.62);
+  await p.mouse.move(red[0], red[1]); await p.mouse.down(); await p.mouse.up();
+  assert.equal(await p.inputValue('#codeOut'), code);
+  // 흰공(0.75, 0.95)에서 빨간공(1.55, 0.62) 쪽: 약 22.4°
+  const deg = parseFloat(await p.textContent('#angOut'));
+  assert.ok(Math.abs(deg - 22.4) < 1.5, String(deg));
+  await dragPx(p, red, [red[0] + 30, red[1] + 12]);
+  assert.notEqual(await p.inputValue('#codeOut'), code);
+  noErr(p); await p.context().close();
+});
+test('E2E 55: 처음 온 사람은 공을 끌어 보라는 안내를 보고, 처음 끌면 안내가 바뀌고 사용법 카드가 접힘', async () => {
+  const p = await open();
+  assert.match(await p.textContent('#tableHint'), /공을 끌어 보세요/);
+  assert.equal(await p.$eval('#photoCard', e => e.classList.contains('compact')), false);
+  await dragPx(p, await tablePx(p, 0.75, 0.95), await tablePx(p, 0.95, 0.85));
+  assert.doesNotMatch(await p.textContent('#tableHint'), /끌어 보세요/);
+  assert.equal(await p.$eval('#photoCard', e => e.classList.contains('compact')), true);
+  assert.equal(await p.evaluate(() => localStorage.getItem('cue3-dragged')), '1');
+  assert.match(await p.textContent('#status'), /직접 놓은 배치/);
+  // 다시 열면 맥박 안내 없음
+  await p.reload(); await p.waitForSelector('#solChips .chip:not(.skel)', { timeout: 30000 });
+  assert.doesNotMatch(await p.textContent('#tableHint'), /끌어 보세요/);
   noErr(p); await p.context().close();
 });

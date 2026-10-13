@@ -16,6 +16,7 @@
   --accent-ink: #ffffff;
   --accent-soft: #dbe6fa;
   --brass: #c08f2c;
+  --brass-ink: #ffdf9a; /* 천 위에 쓰는 쿠션 포인트 숫자 */
   --cloth: #2158b8;
   --cloth-deep: #17428f;
   --rail: #4a2f1e;
@@ -37,7 +38,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0c131f; --surface: #131d2c; --surface-2: #1a2637; --ink: #e5ebf4; --muted: #93a2b8; --line: #263449;
-    --accent: #6ea6ff; --accent-ink: #0a1324; --accent-soft: #1b2c4a; --brass: #d8a94c;
+    --accent: #6ea6ff; --accent-ink: #0a1324; --accent-soft: #1b2c4a; --brass: #d8a94c; --brass-ink: #ffe3a8;
     --cloth: #1f53ad; --cloth-deep: #153a7c; --rail: #3d2617; --rail-hi: #5a3a26; --pearl: #e9dfc4;
     --path: #ffffff; --path-edge: rgba(0, 0, 0, 0.6);
     --good: #3cc48d; --warn: #e3a33d; --bad: #ef6b6b;
@@ -46,7 +47,7 @@
 }
 :root[data-theme="dark"] {
   --bg: #0c131f; --surface: #131d2c; --surface-2: #1a2637; --ink: #e5ebf4; --muted: #93a2b8; --line: #263449;
-  --accent: #6ea6ff; --accent-ink: #0a1324; --accent-soft: #1b2c4a; --brass: #d8a94c;
+  --accent: #6ea6ff; --accent-ink: #0a1324; --accent-soft: #1b2c4a; --brass: #d8a94c; --brass-ink: #ffe3a8;
   --cloth: #1f53ad; --cloth-deep: #153a7c; --rail: #3d2617; --rail-hi: #5a3a26; --pearl: #e9dfc4;
   --path: #ffffff; --path-edge: rgba(0, 0, 0, 0.6);
   --good: #3cc48d; --warn: #e3a33d; --bad: #ef6b6b;
@@ -1497,6 +1498,7 @@ if (typeof module !== 'undefined') module.exports = Core;
   const SPEEDS = { slow: 0.20, mid: 0.15, fast: 0.11 };
   const RAILV = 0.15, CUSH = 0.032;
   const BALLNAME = { white: '흰공', yellow: '노란공', red: '빨간공' };
+  const KEYS = ['white', 'yellow', 'red'];
   const RAILNAME = ['아래 장', '오른쪽 단', '위 장', '왼쪽 단'];
   const SAMPLE = { white: { x: 0.75, y: 0.95 }, red: { x: 1.55, y: 0.62 }, yellow: { x: 2.35, y: 1.15 } };
 
@@ -1517,13 +1519,6 @@ if (typeof module !== 'undefined') module.exports = Core;
     try { localStorage.setItem('cue3-settings', JSON.stringify({ table: state.table, myBall: state.myBall, spinGain: state.spinGain, speed: state.speed, showPhoto: state.showPhoto, playSpeed: state.playSpeed, hideAns: state.hideAns })); } catch (e) { /* 무시 */ }
   }
 
-  // 마지막 공 배치 기억 (같은 테이블 크기일 때만)
-  try {
-    const L = JSON.parse(localStorage.getItem('cue3-layout') || 'null');
-    if (L && L.table === state.table && L.balls && ['white', 'yellow', 'red'].every(k => L.balls[k] && isFinite(L.balls[k].x) && isFinite(L.balls[k].y))) {
-      state.balls = L.balls; state.source = 'saved';
-    }
-  } catch (e) { /* 저장소 없음 */ }
   function saveLayout() {
     try { localStorage.setItem('cue3-layout', JSON.stringify({ table: state.table, balls: state.balls })); } catch (e) { /* 무시 */ }
   }
@@ -1531,6 +1526,14 @@ if (typeof module !== 'undefined') module.exports = Core;
   const T = () => Engine.TABLES[state.table];
   const otherKey = () => state.myBall === 'white' ? 'yellow' : 'white';
   const objKey = i => i === 0 ? 'red' : otherKey();
+  // 마지막 공 배치 기억 (같은 테이블 크기일 때만). 판 밖·겹친 값은 바로잡아서 씀
+  try {
+    const L = JSON.parse(localStorage.getItem('cue3-layout') || 'null');
+    if (L && L.table === state.table && L.balls && KEYS.every(k => L.balls[k] && isFinite(L.balls[k].x) && isFinite(L.balls[k].y))) {
+      state.balls = { white: { x: +L.balls.white.x, y: +L.balls.white.y }, yellow: { x: +L.balls.yellow.x, y: +L.balls.yellow.y }, red: { x: +L.balls.red.x, y: +L.balls.red.y } };
+      normalizeBalls(); state.source = 'saved';
+    }
+  } catch (e) { /* 저장소 없음 */ }
   function ctxObj() {
     return {
       table: state.table, cue: state.balls[state.myBall],
@@ -1538,7 +1541,6 @@ if (typeof module !== 'undefined') module.exports = Core;
       spinGain: state.spinGain, decel: SPEEDS[state.speed]
     };
   }
-  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
   let toastTimer = 0;
   function toast(msg, kind) {
@@ -1832,6 +1834,7 @@ if (typeof module !== 'undefined') module.exports = Core;
   // ---------- 당구대 그리기 ----------
   const cvT = $('#cvTable');
   let geo = { s: 100, w: 300, h: 150 };
+  let pulseT0 = 0, pulseRaf = 0; // 처음 온 사람용 맥박 링
   function layoutTable() {
     const t = T();
     const w = cvT.parentElement.clientWidth; if (!w) return; // 숨은 상태면 그대로 둠
@@ -1881,6 +1884,16 @@ if (typeof module !== 'undefined') module.exports = Core;
     g.restore();
   }
 
+  // 당구대 색·글꼴: 그릴 때마다 getComputedStyle을 부르지 않게 모아 둠. 테마가 바뀌면 비움
+  let tok = null;
+  function readTok() {
+    const cs = getComputedStyle(document.documentElement);
+    tok = {};
+    for (const n of ['accent', 'bad', 'ball-red', 'ball-white', 'ball-yellow', 'brass', 'brass-ink', 'cloth', 'cloth-deep', 'f-body', 'f-num', 'good', 'path', 'path-edge', 'pearl', 'rail', 'rail-hi'])
+      tok[n.replace(/-(\w)/g, (m, c) => c.toUpperCase())] = cs.getPropertyValue('--' + n).trim();
+    return tok;
+  }
+
   function currentShot() {
     if (state.mode === 'aim') return aimShot;
     if (state.mode === 'sys') return null;
@@ -1890,32 +1903,34 @@ if (typeof module !== 'undefined') module.exports = Core;
   }
 
   function drawTable() {
+    if (!tok) readTok();
+    if (pulseT0 && state.source !== 'sample') endPulse();
     const g = cvT.getContext('2d'), t = T(), s = geo.s;
     g.setTransform(geo.dpr, 0, 0, geo.dpr, 0, 0);
     g.clearRect(0, 0, geo.w, geo.h);
     // 레일
-    const rail = css('--rail'), railHi = css('--rail-hi');
+    const rail = tok.rail, railHi = tok.railHi;
     const rg = g.createLinearGradient(0, 0, 0, geo.h);
     rg.addColorStop(0, railHi); rg.addColorStop(0.5, rail); rg.addColorStop(1, railHi);
     roundRect(g, 0, 0, geo.w, geo.h, 10); g.fillStyle = rg; g.fill();
     // 쿠션
-    g.fillStyle = css('--cloth-deep');
+    g.fillStyle = tok.clothDeep;
     g.fillRect(TX(-CUSH), TY(-CUSH), (t.W + 2 * CUSH) * s, (t.H + 2 * CUSH) * s);
     // 천 / 사진
     if (state.showPhoto && state.warped && state.source === 'photo') {
       g.drawImage(state.warped, TX(0), TY(0), t.W * s, t.H * s);
     } else {
       const cg = g.createRadialGradient(TX(t.W / 2), TY(t.H / 2), 10, TX(t.W / 2), TY(t.H / 2), t.W * s * 0.65);
-      cg.addColorStop(0, shade(css('--cloth'), 0.08)); cg.addColorStop(1, css('--cloth'));
+      cg.addColorStop(0, shade(tok.cloth, 0.08)); cg.addColorStop(1, tok.cloth);
       g.fillStyle = cg; g.fillRect(TX(0), TY(0), t.W * s, t.H * s);
       // 천 결: 아주 옅은 잡티 무늬
       g.save(); g.globalAlpha = 0.07; g.fillStyle = feltPattern(g); g.fillRect(TX(0), TY(0), t.W * s, t.H * s); g.restore();
     }
     // 다이아몬드 (mid는 Engine.DIA와 같은 값이어야 겨냥 숫자와 그림이 맞음)
-    const pearl = css('--pearl'), mid = (RAILV + CUSH) / 2 + 0.005;
+    const pearl = tok.pearl, mid = (RAILV + CUSH) / 2 + 0.005;
     g.fillStyle = pearl;
     const dia = (x, y) => { const z = Math.max(2.2, 0.012 * s); g.beginPath(); g.moveTo(x, y - z); g.lineTo(x + z * 0.7, y); g.lineTo(x, y + z); g.lineTo(x - z * 0.7, y); g.closePath(); g.fill(); };
-    g.font = `500 ${Math.max(8, Math.min(11, s * 0.045))}px ${css('--f-num') || 'monospace'}`;
+    g.font = `700 ${Math.max(10, Math.min(13, s * 0.06))}px ${tok.fNum || 'monospace'}`;
     g.textAlign = 'center'; g.textBaseline = 'middle';
     // 위 장쿠션·왼쪽 단쿠션은 짝수 포인트 자리에 숫자를 새김
     for (let i = 0; i <= 8; i++) {
@@ -1938,19 +1953,22 @@ if (typeof module !== 'undefined') module.exports = Core;
       if (shot.objPts && shot.objPts.length > 1) polyline(g, shot.objPts.map(M), 'rgba(255,120,120,0.85)', 1.6, [5, 5]);
       const pts = rec.path.map(M);
       // 조준선(수구 → 첫 지점)
-      polyline(g, pts, css('--path'), 2, null, css('--path-edge'));
-      for (let i = 0; i < pts.length - 1; i++) arrowOn(g, pts[i], pts[i + 1], css('--path'));
+      polyline(g, pts, tok.path, 2, null, tok.pathEdge);
+      for (let i = 0; i < pts.length - 1; i++) arrowOn(g, pts[i], pts[i + 1], tok.path);
       if (rec.evs.length && rec.evs[0].type === 'b' && !anim) {
-        const h = Engine.railHit(Engine.makeCtx(ctxObj()), rec.theta);
+        const C = Engine.makeCtx(ctxObj()), h = Engine.railHit(C, rec.theta);
         if (h) {
           const a = M(rec.contact), b = M(h);
           polyline(g, [a, b], 'rgba(255,255,255,0.5)', 1.2, [2, 5]);
           g.beginPath(); g.arc(b.x, b.y, 4, 0, Math.PI * 2); g.lineWidth = 1.4; g.strokeStyle = 'rgba(255,255,255,0.75)'; g.stroke();
+          // 겨냥 원 옆에 다이아몬드 포인트
+          const d = diaFor(C, rec, h);
+          if (d) railLabel(g, b, h.rail, railPoint(d), '#ffffff', 7);
         }
       }
       if (rec.contact && !anim) {
         const c = M(rec.contact);
-        g.save(); g.setLineDash([3, 3]); g.lineWidth = 1.4; g.strokeStyle = css('--path');
+        g.save(); g.setLineDash([3, 3]); g.lineWidth = 1.4; g.strokeStyle = tok.path;
         g.beginPath(); g.arc(c.x, c.y, R, 0, Math.PI * 2); g.stroke(); g.restore();
       }
       // 쿠션 번호
@@ -1959,13 +1977,14 @@ if (typeof module !== 'undefined') module.exports = Core;
         const n = [[0, -1], [1, 0], [0, 1], [-1, 0]][e.rail]; // 수학 좌표 바깥쪽
         const p = M({ x: e.x + n[0] * Engine.R, y: e.y + n[1] * Engine.R });
         const rr = Math.max(7, Math.min(10, s * 0.035));
-        g.beginPath(); g.arc(p.x, p.y, rr, 0, Math.PI * 2); g.fillStyle = css('--brass'); g.fill();
+        g.beginPath(); g.arc(p.x, p.y, rr, 0, Math.PI * 2); g.fillStyle = tok.brass; g.fill();
         g.lineWidth = 1.2; g.strokeStyle = 'rgba(0,0,0,0.35)'; g.stroke();
-        g.fillStyle = '#1a1206'; g.font = `700 ${rr * 1.15}px ${css('--f-num') || 'monospace'}`;
+        g.fillStyle = '#1a1206'; g.font = `700 ${rr * 1.15}px ${tok.fNum || 'monospace'}`;
         g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(e.n), p.x, p.y + 0.5);
+        railLabel(g, p, e.rail, railPoint(e), tok.brassInk, rr + 3);
       }
       if (rec.stopAt) {
-        const p = M(rec.stopAt); g.save(); g.strokeStyle = css('--bad'); g.lineWidth = 2.2;
+        const p = M(rec.stopAt); g.save(); g.strokeStyle = tok.bad; g.lineWidth = 2.2;
         g.beginPath(); g.moveTo(p.x - 5, p.y - 5); g.lineTo(p.x + 5, p.y + 5); g.moveTo(p.x + 5, p.y - 5); g.lineTo(p.x - 5, p.y + 5); g.stroke(); g.restore();
       }
     }
@@ -1975,29 +1994,83 @@ if (typeof module !== 'undefined') module.exports = Core;
       const r = state.sys.rows[state.sys.sel];
       if (r) {
         const pts = r.path.slice(0, 5).map(M);
-        polyline(g, pts, css('--path'), 2.2, null, css('--path-edge'));
-        for (let i = 0; i < pts.length - 1; i++) arrowOn(g, pts[i], pts[i + 1], css('--path'));
+        polyline(g, pts, tok.path, 2.2, null, tok.pathEdge);
+        for (let i = 0; i < pts.length - 1; i++) arrowOn(g, pts[i], pts[i + 1], tok.path);
       }
     }
     // 공
-    const cols = { white: css('--ball-white'), yellow: css('--ball-yellow'), red: css('--ball-red') };
+    const cols = { white: tok.ballWhite, yellow: tok.ballYellow, red: tok.ballRed };
     const pos = {};
     for (const k of ['red', 'white', 'yellow']) pos[k] = { x: TX(state.balls[k].x), y: TY(state.balls[k].y) };
     if (anim) Object.assign(pos, anim.pos);
     if (anim && anim.scored) {
       const p = pos[anim.secondKey];
-      g.beginPath(); g.arc(p.x, p.y, R + 7, 0, Math.PI * 2); g.lineWidth = 3; g.strokeStyle = css('--good'); g.stroke();
+      g.beginPath(); g.arc(p.x, p.y, R + 7, 0, Math.PI * 2); g.lineWidth = 3; g.strokeStyle = tok.good; g.stroke();
     }
     for (const k of ['red', 'white', 'yellow']) {
-      ball(g, pos[k].x, pos[k].y, R, cols[k], k === cueKey && !anim ? css('--accent') : null);
+      ball(g, pos[k].x, pos[k].y, R, cols[k], k === cueKey && !anim ? tok.accent : null);
     }
     if (anim) return;
+    // 처음 온 사람: 공이 끌린다는 걸 맥박처럼 커졌다 작아지는 링으로 알림
+    if (pulseT0 && !drag && state.source === 'sample') {
+      const k = motion() === 'auto' ? 0.5 : 0.5 - 0.5 * Math.cos((performance.now() - pulseT0) / 1200 * 2 * Math.PI);
+      g.save(); g.lineWidth = 2; g.strokeStyle = `rgba(255,255,255,${(0.9 - 0.5 * k).toFixed(2)})`;
+      for (const key of KEYS) { g.beginPath(); g.arc(pos[key].x, pos[key].y, R + 6 + 6 * k, 0, Math.PI * 2); g.stroke(); }
+      g.restore();
+    }
     // 내 공 표시
     const cb = state.balls[cueKey];
-    g.save(); g.font = `700 11px ${css('--f-body') || 'sans-serif'}`; g.textAlign = 'center';
+    g.save(); g.font = `700 11px ${tok.fBody || 'sans-serif'}`; g.textAlign = 'center';
     const ly = TY(cb.y) - R - 8 < TY(0) + 4 ? TY(cb.y) + R + 16 : TY(cb.y) - R - 8;
     g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.strokeText('내 공', TX(cb.x), ly);
     g.fillStyle = '#ffffff'; g.fillText('내 공', TX(cb.x), ly); g.restore();
+    if (drag && drag.kind === 'ball' && !drag.pending) drawDragAids(g, drag);
+  }
+  // 레일 쪽 표시 옆 작은 숫자: 장쿠션은 오른쪽(오른쪽 끝이면 왼쪽), 단쿠션은 아래(아래 끝이면 위)
+  function railLabel(g, p, rail, txt, col, gap) {
+    const t = T();
+    g.save(); g.font = `700 10px ${tok.fNum || 'monospace'}`; g.lineJoin = 'round';
+    let x = p.x, y = p.y;
+    if (rail % 2 === 0) {
+      const right = p.x < TX(t.W) - 34;
+      g.textAlign = right ? 'left' : 'right'; g.textBaseline = 'middle'; x += right ? gap : -gap;
+    } else {
+      const below = p.y < TY(t.H) - 22;
+      g.textAlign = 'center'; g.textBaseline = below ? 'top' : 'bottom'; y += below ? gap : -gap;
+    }
+    g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.strokeText(txt, x, y);
+    g.fillStyle = col; g.fillText(txt, x, y); g.restore();
+  }
+  // 끄는 동안: 손가락과 공 사이 가는 선, 손가락 반대쪽 위 3배 확대경, 왼쪽 위 좌표 알약
+  let loupeC = null;
+  function drawDragAids(g, d) {
+    const t = T(), b = state.balls[d.key], bx = TX(b.x), by = TY(b.y);
+    const fx = d.fp ? TX(d.fp.x) : bx, fy = d.fp ? TY(d.fp.y) : by;
+    if (d.lift && d.fp) {
+      g.save(); g.lineWidth = 1; g.strokeStyle = 'rgba(255,255,255,0.75)';
+      g.beginPath(); g.moveTo(fx, fy); g.lineTo(bx, by); g.stroke(); g.restore();
+    }
+    // 확대경: 사진 모서리 확대경과 같은 방식. 같은 캔버스를 바로 그리지 않고 작은 캔버스에 떼어 옴
+    const L = 55, Z = 3, dpr = geo.dpr || 1;
+    const lx = fx < geo.w / 2 ? geo.w - L - 8 : L + 8, ly = L + 8 + (lx < geo.w / 2 ? 30 : 0);
+    const n = Math.max(1, Math.round(2 * L / Z * dpr)), sx = Math.round(bx * dpr - n / 2), sy = Math.round(by * dpr - n / 2);
+    if (!loupeC) loupeC = document.createElement('canvas');
+    loupeC.width = loupeC.height = n; // 크기를 다시 정하면 비워짐
+    const x0 = Math.max(0, sx), y0 = Math.max(0, sy), x1 = Math.min(cvT.width, sx + n), y1 = Math.min(cvT.height, sy + n);
+    if (x1 > x0 && y1 > y0) loupeC.getContext('2d').drawImage(cvT, x0, y0, x1 - x0, y1 - y0, x0 - sx, y0 - sy, x1 - x0, y1 - y0);
+    g.save(); g.beginPath(); g.arc(lx, ly, L, 0, Math.PI * 2); g.clip();
+    g.fillStyle = '#000'; g.fillRect(lx - L, ly - L, 2 * L, 2 * L);
+    g.drawImage(loupeC, lx - L, ly - L, 2 * L, 2 * L);
+    g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(lx - L, ly); g.lineTo(lx + L, ly); g.moveTo(lx, ly - L); g.lineTo(lx, ly + L); g.stroke();
+    g.restore();
+    g.beginPath(); g.arc(lx, ly, L, 0, Math.PI * 2); g.lineWidth = 2; g.strokeStyle = '#ffffff'; g.stroke();
+    g.beginPath(); g.arc(lx, ly, L + 1.5, 0, Math.PI * 2); g.lineWidth = 1; g.strokeStyle = 'rgba(0,0,0,0.5)'; g.stroke();
+    // 좌표: 장쿠션 포인트(왼쪽 0 → 오른쪽 8), 단쿠션 포인트(위 0 → 아래 4)
+    const txt = `${BALLNAME[d.key]} · 장 ${(b.x / (t.W / 8)).toFixed(1)} · 단 ${(b.y / (t.H / 4)).toFixed(1)}`;
+    g.save(); g.font = `600 12px ${tok.fBody || 'sans-serif'}`; g.textAlign = 'left'; g.textBaseline = 'middle';
+    roundRect(g, 8, 8, g.measureText(txt).width + 18, 24, 12); g.fillStyle = 'rgba(10,16,28,0.82)'; g.fill();
+    g.fillStyle = '#ffffff'; g.fillText(txt, 17, 20.5); g.restore();
   }
   let feltSrc = null;
   function feltPattern(g) {
@@ -2025,29 +2098,63 @@ if (typeof module !== 'undefined') module.exports = Core;
     const t = T(), R = Engine.R;
     return { x: Math.min(t.W - R, Math.max(R, p.x)), y: Math.min(t.H - R, Math.max(R, p.y)) };
   }
+  // 다른 공과 2R+3mm 넘게 떨어뜨림. 중심선으로 밀다 레일에 막히면 레일을 따라(수직 방향) 밀고,
+  // 그래도 안 되면 12방향 나선형으로 10cm까지 찾아 판 안의 빈자리에 놓음
   function separate(key) {
-    const R = Engine.R, b = state.balls[key];
-    for (const k of Object.keys(state.balls)) {
-      if (k === key) continue;
-      const o = state.balls[k]; const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy);
-      if (d < 2 * R + 0.002) {
-        const ux = d > 1e-6 ? dx / d : 1, uy = d > 1e-6 ? dy / d : 0;
-        state.balls[key] = clampBall({ x: o.x + ux * (2 * R + 0.003), y: o.y + uy * (2 * R + 0.003) });
+    const R = Engine.R, t = T(), gap = 2 * R + 0.003;
+    const others = KEYS.filter(k => k !== key).map(k => state.balls[k]);
+    const free = p => others.every(o => Math.hypot(p.x - o.x, p.y - o.y) >= gap - 1e-7);
+    const inside = p => p.x >= R && p.x <= t.W - R && p.y >= R && p.y <= t.H - R;
+    const b = clampBall(state.balls[key]);
+    state.balls[key] = b;
+    if (free(b)) return;
+    const near = others.filter(o => Math.hypot(b.x - o.x, b.y - o.y) < gap).sort((u, v) => Math.hypot(b.x - u.x, b.y - u.y) - Math.hypot(b.x - v.x, b.y - v.y));
+    for (const o of near) {
+      const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy);
+      const ux = d > 1e-6 ? dx / d : 1, uy = d > 1e-6 ? dy / d : 0;
+      const base = clampBall({ x: o.x + ux * gap, y: o.y + uy * gap });
+      if (free(base)) { state.balls[key] = base; return; }
+      for (let mm = 3; mm <= 60; mm += 3) {
+        for (const sg of [1, -1]) {
+          const c = clampBall({ x: base.x - uy * sg * mm / 1000, y: base.y + ux * sg * mm / 1000 });
+          if (free(c)) { state.balls[key] = c; return; }
+        }
+      }
+    }
+    for (let i = 1; i <= 20; i++) {
+      const r = i * 0.005;
+      for (let j = 0; j < 12; j++) {
+        const a = (j + i * 0.5) * Math.PI / 6;
+        const c = { x: b.x + r * Math.cos(a), y: b.y + r * Math.sin(a) };
+        if (inside(c) && free(c)) { state.balls[key] = c; return; }
       }
     }
   }
+  // 세 공 모두 판 안으로, 서로 겹치지 않게 (되돌리기·저장값·받은 배치)
+  function normalizeBalls() {
+    for (const k of KEYS) state.balls[k] = clampBall(state.balls[k]);
+    for (const k of KEYS) separate(k);
+  }
+  const HIT = () => Math.max(Engine.R * 2.6, 22 / geo.s);
   cvT.addEventListener('pointerdown', ev => {
+    stopPulse();
     const p = tablePt(ev);
-    const hit = Math.max(Engine.R * 2.6, 22 / geo.s);
+    const hit = HIT();
     let best = null, bd = Infinity;
-    for (const k of Object.keys(state.balls)) {
+    for (const k of KEYS) {
       const b = state.balls[k]; const d = Math.hypot(b.x - p.x, b.y - p.y);
       if (d < hit && d < bd) { bd = d; best = k; }
     }
     stopAnim();
     if (best) {
-      const b = state.balls[best];
-      drag = { kind: 'ball', key: best, ox: b.x - p.x, oy: b.y - p.y, before: snapBalls() };
+      const b = state.balls[best], touch = ev.pointerType === 'touch';
+      // 계산 중이던 결과는 버림(끄는 도중 옛 배치의 길이 끼어들지 않게)
+      state.solveId++;
+      // 터치는 공을 손가락보다 28px 위로 띄워 가리지 않게 함. 직접 조준과 터치는 6px 넘게 움직여야 공이 움직임
+      drag = {
+        kind: 'ball', key: best, ox: b.x - p.x, oy: b.y - p.y - (touch ? 28 / geo.s : 0), before: snapBalls(),
+        lift: touch, pending: state.mode === 'aim' || touch, sx: ev.clientX, sy: ev.clientY, fp: p, sols: state.sols
+      };
     } else if (state.mode === 'aim') {
       drag = { kind: 'aim' }; setAimFrom(p);
     } else return;
@@ -2057,35 +2164,49 @@ if (typeof module !== 'undefined') module.exports = Core;
   cvT.addEventListener('pointermove', ev => {
     if (!drag) {
       if (ev.pointerType === 'mouse') {
-        const p = tablePt(ev), hit = Math.max(Engine.R * 2.6, 22 / geo.s);
+        const p = tablePt(ev), hit = HIT();
         const near = Object.values(state.balls).some(b => Math.hypot(b.x - p.x, b.y - p.y) < hit);
         cvT.style.cursor = near ? 'grab' : state.mode === 'aim' ? 'crosshair' : 'default';
       }
       return;
     }
-    if (drag.kind === 'ball') cvT.style.cursor = 'grabbing';
     const p = tablePt(ev);
     if (drag.kind === 'ball') {
+      if (drag.pending) {
+        if (Math.hypot(ev.clientX - drag.sx, ev.clientY - drag.sy) <= 6) return;
+        drag.pending = false;
+      }
+      cvT.style.cursor = 'grabbing';
+      drag.fp = p;
       state.balls[drag.key] = clampBall({ x: p.x + drag.ox, y: p.y + drag.oy });
       if (state.mode === 'aim') updateAim(); else { state.sols = []; }
       if (state.mode === 'sys' && drag.key === state.myBall) { state.sys.rows = Engine.sysTable(ctxObj(), { rail: state.sys.rail, E: state.sys.tip, flip: state.sys.flip, auto: true, vk: 0 }); renderSys(); }
       drawTable();
     } else setAimFrom(p);
   });
-  const endDrag = () => {
+  const endDrag = ev => {
     if (!drag) return;
     const d = drag; drag = null;
-    if (d.kind === 'ball') {
+    if (d.kind !== 'ball') return;
+    const nb = state.balls[d.key], ob = d.before[d.key];
+    if (!d.pending && Math.hypot(nb.x - ob.x, nb.y - ob.y) >= 1e-4) {
       separate(d.key);
-      const nb = state.balls[d.key], ob = d.before[d.key];
-      if (Math.hypot(nb.x - ob.x, nb.y - ob.y) >= 1e-4) {
-        pushUndo(d.before);
-        if (state.source === 'sample') state.source = 'saved';
-        saveLayout();
-      }
+      for (const k of KEYS) if (k !== d.key) separate(k);
+      pushUndo(d.before);
+      if (state.source === 'photo') { (state.detect = state.detect || {})[d.key] = true; renderStatus(); } else state.source = 'manual';
+      saveLayout();
+      // 처음 끌어 본 사람은 사용법 카드를 접어 당구대를 먼저 보여 줌
+      try { if (!localStorage.getItem('cue3-dragged')) { localStorage.setItem('cue3-dragged', '1'); setSteps(false); } } catch (e) { /* 무시 */ }
       if (state.mode === 'aim') { updateAim(); drawTable(); }
       requestSolve();
+      return;
     }
+    // 움직이지 않은 탭: 고른 길·펼친 정답은 그대로. 직접 조준에서는 그곳을 겨냥
+    if (!state.solving) state.sols = d.sols; // 끄는 동안 비운 길을 되살림(제자리로 돌아온 경우)
+    if (d.pending && state.mode === 'aim' && ev && ev.type === 'pointerup') setAimFrom(tablePt(ev));
+    else drawTable();
+    // pointerdown에서 버린 계산이 있었으면 다시 요청
+    if (state.solving) requestSolve();
   };
   cvT.addEventListener('pointerup', endDrag);
   cvT.addEventListener('pointercancel', endDrag);
@@ -2100,7 +2221,8 @@ if (typeof module !== 'undefined') module.exports = Core;
   $('#btnUndo').addEventListener('click', () => {
     const snap = undoStack.pop(); if (!snap) return;
     $('#btnUndo').disabled = !undoStack.length;
-    state.balls = snap; saveLayout();
+    // 테이블 크기를 바꾼 뒤 되돌려도 판 밖으로 나가지 않게
+    state.balls = snap; normalizeBalls(); saveLayout();
     aimShot = null; if (state.mode === 'aim') updateAim();
     drawTable(); requestSolve();
   });
@@ -2240,6 +2362,37 @@ if (typeof module !== 'undefined') module.exports = Core;
     state.aim.theta += (+b.dataset.d) * Math.PI / 180; updateAim(); drawTable();
   }));
 
+  // ---------- 당구대 안내 ----------
+  const HINT = {
+    rec: '공을 끌어서 위치를 고칠 수 있어요. 놓으면 길을 다시 계산합니다.',
+    aim: '누르거나 끌면 그쪽을 겨냥하고, 공을 끌면 위치가 바뀌어요.',
+    sys: '수구를 끌어 옮기면 표가 바로 바뀌어요.'
+  };
+  function setHint() {
+    $('#tableHint').textContent = pulseT0 && state.mode === 'rec' ? '공을 끌어 보세요. 놓으면 바로 길이 다시 나와요.' : HINT[state.mode];
+  }
+  // 처음 온 사람(예시 배치, 끌어 본 적 없음): 세 공에 맥박 링. 첫 pointerdown이나 배치가 바뀌면 멈춤
+  function startPulse() {
+    let fresh = true;
+    try { fresh = !localStorage.getItem('cue3-dragged'); } catch (e) { /* 저장소 없음 */ }
+    if (state.source !== 'sample' || !fresh || pulseT0) return;
+    pulseT0 = performance.now(); setHint(); drawTable();
+    if (motion() === 'auto') return; // 움직임 줄이기: 고정 링만
+    let last = 0;
+    const frame = now => {
+      if (!pulseT0) return;
+      // 당구대가 화면에 보일 때만 초당 25번쯤 다시 그림
+      if (now - last > 40 && !anim && !drag && state.view === 'table' && !$('#tabFind').hidden) {
+        const r = cvT.getBoundingClientRect();
+        if (r.bottom > 0 && r.top < innerHeight) { last = now; drawTable(); }
+      }
+      if (pulseT0) pulseRaf = requestAnimationFrame(frame);
+    };
+    pulseRaf = requestAnimationFrame(frame);
+  }
+  function endPulse() { pulseT0 = 0; cancelAnimationFrame(pulseRaf); setHint(); }
+  function stopPulse() { if (pulseT0) { endPulse(); drawTable(); } }
+
   function setMode(m) {
     stopAnim();
     state.mode = m;
@@ -2251,7 +2404,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     $('#sysPanel').hidden = m !== 'sys';
     $('#viewTable').classList.toggle('sys', m === 'sys');
     if (m === 'sys') computeSys();
-    $('#tableHint').textContent = m === 'aim' ? '빈 곳을 끌면 조준, 공을 끌면 위치 이동이에요.' : m === 'sys' ? '수구를 끌어 옮기면 표가 바로 바뀌어요.' : '공을 끌어서 위치를 고칠 수 있어요. 놓으면 길을 다시 계산합니다.';
+    setHint();
     renderStrip();
     if (m === 'aim') {
       const s = state.sols[state.sel];
@@ -2571,8 +2724,7 @@ if (typeof module !== 'undefined') module.exports = Core;
   function setBalls(balls, source) {
     pushUndo(snapBalls());
     state.balls = balls; state.source = source; state.detect = null;
-    for (const k of ['white', 'yellow', 'red']) state.balls[k] = clampBall(state.balls[k]);
-    for (const k of ['white', 'yellow', 'red']) separate(k);
+    normalizeBalls();
     saveLayout(); aimShot = null;
     if (state.mode === 'aim') updateAim();
     drawTable(); requestSolve(); renderCode();
@@ -3507,10 +3659,10 @@ if (typeof module !== 'undefined') module.exports = Core;
   ro.observe(cvT.parentElement);
   ro.observe($('#cvPhoto').parentElement);
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
-  if (mq.addEventListener) mq.addEventListener('change', () => drawTable());
-  new MutationObserver(() => drawTable()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  if (mq.addEventListener) mq.addEventListener('change', () => { tok = null; drawTable(); });
+  new MutationObserver(() => { tok = null; drawTable(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => drawTable());
-  layoutTable(); renderStatus(); drawTable(); requestSolve(); renderCode();
+  layoutTable(); renderStatus(); drawTable(); requestSolve(); renderCode(); startPulse();
   const h0 = (location.hash || '').slice(1);
   if (h0 === 'score' || h0 === 'tips') showTab(h0);
   // 글꼴은 첫 화면과 계산을 막지 않게 나중에 붙임
