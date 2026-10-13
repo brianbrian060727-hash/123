@@ -1368,7 +1368,19 @@ const Vision = (() => {
       if (y < h - 1 && mask[i + w] && !vis[i + w]) { vis[i + w] = 1; st.push(i + w); }
     }
     if (area < w * h * 0.08) return null;
-    return { quad: [[tl[0], tl[1]], [tr[0], tr[1]], [br[0], br[1]], [bl[0], bl[1]]], clothHue: hc, clothV };
+    const quad = [[tl[0], tl[1]], [tr[0], tr[1]], [br[0], br[1]], [bl[0], bl[1]]];
+    // 값싼 검사: 너무 짧은 변, 볼록하지 않은 모양, 천 넓이와 동떨어진 사각형(45° 근처 오검출)은 못 찾은 것으로
+    const minSide = Math.hypot(w, h) * 0.08;
+    let sign = 0, qa = 0;
+    for (let k = 0; k < 4; k++) {
+      const a = quad[k], b = quad[(k + 1) % 4], c = quad[(k + 2) % 4];
+      if (Math.hypot(b[0] - a[0], b[1] - a[1]) < minSide) return null;
+      const s = Math.sign((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]));
+      if (!s || (sign && s !== sign)) return null;
+      sign = s; qa += a[0] * b[1] - b[0] * a[1];
+    }
+    if (Math.abs(qa) / 2 < area * 0.85) return null;
+    return { quad, clothHue: hc, clothV };
   }
 
   // 천 바깥 테두리(쿠션 윗면 포함) → 쿠션 끝선 안쪽으로 당기기
@@ -2909,8 +2921,10 @@ if (typeof module !== 'undefined') module.exports = Core;
   }
   async function decodeImage(file) {
     if (window.createImageBitmap) {
-      // 갤럭시 고화소(50MP·200MP) 사진도 메모리 걱정 없이: 디코딩하면서 바로 줄이기
-      try { const bm = await createImageBitmap(file, { imageOrientation: 'from-image', resizeWidth: 1600, resizeQuality: 'high' }); if (bm && bm.width) return bm; } catch (e) { /* 다음 방법 */ }
+      // 큰 사진은 디코딩하며 줄이기를 시도(크롬은 메모리 절감 효과가 작음). 작은 사진은 키우지 않게 그대로 엶
+      if (file.size > 2.5 * 1024 * 1024) {
+        try { const bm = await createImageBitmap(file, { imageOrientation: 'from-image', resizeWidth: 1600, resizeQuality: 'high' }); if (bm && bm.width) return bm; } catch (e) { /* 다음 방법 */ }
+      }
       try { const bm = await createImageBitmap(file, { imageOrientation: 'from-image' }); if (bm && bm.width) return bm; } catch (e) { /* 다음 방법 */ }
       try { const bm = await createImageBitmap(file); if (bm && bm.width) return bm; } catch (e) { /* 다음 방법 */ }
     }
@@ -3035,12 +3049,15 @@ if (typeof module !== 'undefined') module.exports = Core;
     setTimeout(() => { analyzePhoto(true); $('#btnConfirm').disabled = false; $('#btnConfirm').textContent = '확정하고 공 찾기'; }, 30);
   });
 
+  // 지금 당구대 배경으로 편 사진과 그때의 코너
+  let warpedOf = null;
   function analyzePhoto(detect) {
     const t = T(); const gw = 900, gh = Math.round(900 * t.H / t.W);
     const wp = Vision.warp(state.photo.data, state.quad, t.W, t.H, gw, gh);
     const wc = document.createElement('canvas'); wc.width = gw; wc.height = gh;
     wc.getContext('2d').putImageData(new ImageData(wp.data, gw, gh), 0, 0);
     state.warped = wc;
+    warpedOf = { photo: state.photo, quad: JSON.stringify(state.quad) };
     if (detect) {
       pushUndo(snapBalls());
       const det = Vision.detectBalls(wp, t.W, t.H, Engine.R);
@@ -3076,11 +3093,19 @@ if (typeof module !== 'undefined') module.exports = Core;
     });
     sync();
   }
+  // 바뀌기 전 테이블 크기 (받은 배치를 열 때도 맞춰 둠)
+  let prevTable = state.table;
   bindSeg('#segTable', 'table', () => {
     endCalib();
-    for (const k of Object.keys(state.balls)) state.balls[k] = clampBall(state.balls[k]);
+    const t1 = Engine.TABLES[prevTable] || T(), t2 = T();
+    // 사진 배치는 다시 찾지 않고 공을 같은 비율 자리로 옮김: 손으로 고친 자리와 찾음 표시가 남음
+    const photo = state.source === 'photo' && state.photo && state.quad;
+    if (photo) for (const k of KEYS) state.balls[k] = { x: state.balls[k].x * t2.W / t1.W, y: state.balls[k].y * t2.H / t1.H };
+    normalizeBalls();
+    prevTable = state.table;
     if (state.source !== 'sample') saveLayout();
-    if (state.source === 'photo' && state.photo && state.quad) { analyzePhoto(true); return; }
+    // 확정한 사진 그대로일 때만 다시 폄 (새로 고르고 확정 안 한 사진으로 바꿔 펴지 않게)
+    if (photo && warpedOf && warpedOf.photo === state.photo && warpedOf.quad === JSON.stringify(state.quad)) { analyzePhoto(false); return; }
     layoutTable(); aimShot = null; if (state.mode === 'aim') updateAim(); drawTable(); requestSolve();
   });
   bindSeg('#segMy', 'myBall', () => {
@@ -3197,7 +3222,7 @@ if (typeof module !== 'undefined') module.exports = Core;
   function openLayout(L) {
     if ($('#tabFind').hidden) showTab('find');
     if (state.view !== 'table') showView('table');
-    state.table = L.table; state.myBall = L.myBall;
+    state.table = L.table; state.myBall = L.myBall; prevTable = L.table;
     syncSeg('#segTable', L.table); syncSeg('#segMy', L.myBall);
     saveSettings(); syncQuickMy(); layoutTable();
     setBalls(L.balls, 'code');
@@ -4115,11 +4140,15 @@ if (typeof module !== 'undefined') module.exports = Core;
     try {
       const cv = state.warped, W = cv.width, H = cv.height;
       const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.9));
-      const ans = await Ai.sample.json(`이 이미지는 3쿠션 당구대의 플레이 면을 위에서 똑바로 펴 놓은 사진이야. 가로 ${W}px, 세로 ${H}px이고 이미지 테두리가 쿠션 끝선이야. 흰 공, 노란 공, 빨간 공 각각의 중심을 픽셀 좌표로 찾아 줘. 확실히 안 보이는 공은 null로 둬. 다른 말 없이 JSON 하나만: {"white":{"x":123,"y":45},"yellow":{"x":0,"y":0},"red":null}`, { images: [blob] });
+      const ex = (fx, fy) => `{"x":${Math.round(W * fx)},"y":${Math.round(H * fy)}}`;
+      const ans = await Ai.sample.json(`이 이미지는 3쿠션 당구대의 플레이 면을 위에서 똑바로 펴 놓은 사진이야. 가로 ${W}px, 세로 ${H}px이고 이미지 테두리가 쿠션 끝선이야. 흰 공, 노란 공, 빨간 공 각각의 중심을 픽셀 좌표(숫자)로 찾아 줘. 못 찾았거나 확실히 안 보이는 공은 좌표를 짐작하지 말고 그 공 자리에 null을 넣어 줘. 다른 말 없이 JSON 하나만 (숫자는 예시): {"white":${ex(0.42, 0.46)},"yellow":${ex(0.58, 0.54)},"red":null}`, { images: [blob] });
       const t = T(), found = [], nb = JSON.parse(JSON.stringify(state.balls)), det = Object.assign({}, state.detect || {});
+      // 숫자 좌표만 받고, 가장자리에서 공 반지름 안쪽(공이 놓일 수 없는 자리)은 못 찾은 것으로
+      const num = v => typeof v === 'number' && Number.isFinite(v);
+      const rx = Engine.R / t.W * W, ry = Engine.R / t.H * H;
       for (const k of ['white', 'yellow', 'red']) {
         const p = ans && ans[k];
-        if (p && isFinite(p.x) && isFinite(p.y) && p.x >= 0 && p.x <= W && p.y >= 0 && p.y <= H) { nb[k] = { x: p.x / W * t.W, y: p.y / H * t.H }; found.push(BALLNAME[k]); det[k] = true; }
+        if (p && num(p.x) && num(p.y) && p.x >= rx && p.x <= W - rx && p.y >= ry && p.y <= H - ry) { nb[k] = { x: p.x / W * t.W, y: p.y / H * t.H }; found.push(BALLNAME[k]); det[k] = true; }
       }
       if (found.length) { setBalls(nb, 'photo'); state.detect = det; renderStatus(); toast(`Claude가 ${found.join(', ')}을(를) 찾았어요. 어긋나면 끌어서 고쳐 주세요.`, 'info'); }
       else toast('Claude도 공을 찾지 못했어요. 당구대 그림에서 공을 끌어 놓아 주세요.', 'warn');

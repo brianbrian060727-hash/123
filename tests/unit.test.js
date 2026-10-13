@@ -153,6 +153,47 @@ test('비전: 천이 없는 사진은 null', () => {
   const im = { width: 100, height: 80, data: new Uint8ClampedArray(100 * 80 * 4).fill(128) };
   assert.equal(Vision.autoCorners(im), null);
 });
+// 기울어진 천(가로 L, 세로 S, deg도 회전)과 실제 꼭짓점
+function rotSynth(w, h, L, S, deg) {
+  const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), cx = w / 2, cy = h / 2;
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = x + 0.5 - cx, dy = y + 0.5 - cy, u = dx * c + dy * s, v = -dx * s + dy * c;
+    const col = Math.abs(u) <= L / 2 && Math.abs(v) <= S / 2 ? [33, 88, 184] : [74, 47, 30];
+    const i = (y * w + x) * 4; data[i] = col[0]; data[i + 1] = col[1]; data[i + 2] = col[2]; data[i + 3] = 255;
+  }
+  const corners = [[-L / 2, -S / 2], [L / 2, -S / 2], [L / 2, S / 2], [-L / 2, S / 2]].map(([u, v]) => [cx + u * c - v * s, cy + u * s + v * c]);
+  return { im: { width: w, height: h, data }, corners };
+}
+const convex = q => {
+  const cr = q.map((p, i) => { const b = q[(i + 1) % 4], c = q[(i + 2) % 4]; return Math.sign((b[0] - p[0]) * (c[1] - b[1]) - (b[1] - p[1]) * (c[0] - b[0])); });
+  return cr.every(v => v === cr[0] && v !== 0);
+};
+// 결과 꼭짓점마다 가장 가까운 실제 꼭짓점까지의 거리 중 최댓값
+const cornerErr = (q, real) => Math.max(...real.map(t => Math.min(...q.map(p => Math.hypot(p[0] - t[0], p[1] - t[1])))));
+for (const deg of [45, 135]) test(`비전: ${deg}° 돌아간 천은 엉뚱한 사각형 대신 null이거나 맞는 볼록 사각형`, () => {
+  const { im, corners } = rotSynth(480, 360, 300, 150, deg);
+  const a = Vision.autoCorners(im);
+  if (a) { assert.ok(convex(a.quad), JSON.stringify(a.quad)); assert.ok(cornerErr(a.quad, corners) < 20, JSON.stringify(a.quad)); }
+});
+test('비전: 조금 돌아간 천(10°·30°)은 그대로 찾음', () => {
+  for (const deg of [10, 30]) {
+    const { im, corners } = rotSynth(480, 360, 300, 150, deg);
+    const a = Vision.autoCorners(im);
+    assert.ok(a, String(deg));
+    assert.ok(convex(a.quad) && cornerErr(a.quad, corners) < 6, `${deg}: ${JSON.stringify(a.quad)}`);
+  }
+});
+test('비전: 꼭짓점이 셋뿐인 천(변 하나가 너무 짧음)은 null', () => {
+  const w = 480, h = 360, data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    // (240,30)-(450,330)-(30,330) 삼각형
+    const inside = y >= 30 && y <= 330 && Math.abs(x - 240) <= (y - 30) * 0.7;
+    const col = inside ? [33, 88, 184] : [74, 47, 30];
+    const i = (y * w + x) * 4; data[i] = col[0]; data[i + 1] = col[1]; data[i + 2] = col[2]; data[i + 3] = 255;
+  }
+  assert.equal(Vision.autoCorners({ width: w, height: h, data }), null);
+});
 test('비전: 펴기 결과 크기와 불투명', () => {
   const src = synth(300, 200, [], null);
   const out = Vision.warp(src, [[10, 10], [290, 10], [290, 190], [10, 190]], 2.844, 1.422, 90, 45);

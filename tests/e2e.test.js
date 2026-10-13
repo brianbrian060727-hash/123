@@ -270,7 +270,7 @@ const MOCK = `(() => {
     onSnapshot(next) { const s = { fire: () => next(snapDoc(path)) }; subs.push(s); setTimeout(s.fire, 0); return () => {}; } });
   const db = { doc, collection: p => seg(p) && Object.assign(query(p), { path: p, doc: id => doc(p + '/' + (id || Math.random().toString(36).slice(2))) }) };
   const sample = async (input, o) => { window.__prompt = input; const t = '이 길은 두께가 넉넉해서 안전해요.'; o && o.onText && o.onText({ text: t, delta: t }); return { text: t, truncated: false }; };
-  sample.json = async (input, o) => { window.__jsonImages = o && o.images && o.images.length; return { white: { x: 225, y: 150 }, yellow: { x: 675, y: 300 }, red: { x: 450, y: 225 } }; };
+  sample.json = async (input, o) => { window.__jsonImages = o && o.images && o.images.length; window.__jsonPrompt = input; return window.__jsonAns || { white: { x: 225, y: 150 }, yellow: { x: 675, y: 300 }, red: { x: 450, y: 225 } }; };
   sample.limits = async () => ({ maxPromptBytes: 262144, images: { maxCount: 4, maxInputBytes: 2e7, mediaTypes: ['image/jpeg'] } });
   const user = { can: async () => true, id: async () => 'u_test', isOwner: async () => true, canEdit: async () => true };
   const downloads = { save: async r => { window.__saved = r; return { status: 'saved' }; } };
@@ -1360,5 +1360,71 @@ test('E2E 71: 파이브앤하프 그림 — 코너 50이면 굴린 길과 앱 �
   assert.equal(await p.getAttribute('#mSys', 'aria-pressed'), 'true');
   assert.equal(await p.isVisible('#sysPanel'), true);
   assert.equal(await p.$$eval('#sysTable tr[data-k]', e => e.length), 17);
+  noErr(p); await p.context().close();
+});
+// 사진 흉내: 갈색 판 위 파란 천(공 없음)
+async function loadSynthPhoto(p) {
+  const dataUrl = await p.evaluate(() => {
+    const c = document.createElement('canvas'); c.width = 1000; c.height = 600; const g = c.getContext('2d');
+    g.fillStyle = '#4a2f1e'; g.fillRect(0, 0, 1000, 600); g.fillStyle = '#2158b8'; g.fillRect(100, 100, 800, 400);
+    return c.toDataURL('image/png');
+  });
+  await p.setInputFiles('#fileIn', { name: 't.png', mimeType: 'image/png', buffer: Buffer.from(dataUrl.split(',')[1], 'base64') });
+  await p.waitForSelector('#viewCorner:not([hidden])');
+  await p.click('#btnConfirm');
+  await p.waitForSelector('#viewTable:not([hidden])');
+}
+const codeNums = async p => {
+  const m = (await p.inputValue('#codeOut')).match(/^3C-([DJ])-W-(\d{4})-(\d{4})-(\d{4})-(\d{4})-(\d{4})-(\d{4})$/);
+  assert.ok(m, await p.inputValue('#codeOut'));
+  return { t: m[1], v: m.slice(2).map(n => +n / 1000) };
+};
+test('E2E 72: 사진으로 놓은 뒤 손으로 고친 공은 중대로 바꿔도 같은 비율 자리에 남고, 다시 찾지 않음', async () => {
+  const p = await openMock();
+  await loadSynthPhoto(p);
+  assert.equal(await p.$$eval('#status .pill.miss', e => e.length), 3);
+  await dragPx(p, await tablePx(p, 0.75, 0.95), await tablePx(p, 1.0, 0.8));
+  assert.equal(await p.$$eval('#status .pill.miss', e => e.length), 2, '옮긴 흰공은 찾음');
+  const a = await codeNums(p);
+  assert.equal(a.t, 'D');
+  assert.ok(Math.abs(a.v[0] - 1.0) < 0.01 && Math.abs(a.v[1] - 0.8) < 0.01, String(a.v));
+  await p.$eval('#segTable [data-v="jungdae"]', b => b.click());
+  await p.waitForFunction(() => /^3C-J-/.test(document.querySelector('#codeOut').value));
+  const b = await codeNums(p);
+  // 세 공 모두 가로·세로 비율(x/W, y/H)이 그대로
+  for (let i = 0; i < 6; i += 2) {
+    assert.ok(Math.abs(b.v[i] / 2.54 - a.v[i] / 2.844) < 0.002, `x${i / 2} ${a.v} → ${b.v}`);
+    assert.ok(Math.abs(b.v[i + 1] / 1.27 - a.v[i + 1] / 1.422) < 0.002, `y${i / 2} ${a.v} → ${b.v}`);
+  }
+  // 다시 찾지 않으니 찾음 표시가 남고, 사진 배치 그대로라 Claude 줄도 보임
+  assert.equal(await p.$$eval('#status .pill.miss', e => e.length), 2);
+  await p.waitForSelector('#aiRow:not([hidden])', { timeout: 3000 });
+  const L = await layoutLS(p);
+  assert.equal(L.table, 'jungdae');
+  assert.ok(Math.abs(L.balls.white.x / 2.54 - a.v[0] / 2.844) < 0.002, JSON.stringify(L));
+  noErr(p); await p.context().close();
+});
+test('E2E 73: Claude 공 찾기 — 빈 좌표·가장자리 좌표는 못 찾은 것으로, 형식 예시에 0 좌표 없음', async () => {
+  const p = await openMock();
+  await loadSynthPhoto(p);
+  await p.waitForSelector('#aiRow:not([hidden])');
+  const before = await codeNums(p);
+  await p.evaluate(() => { window.__jsonAns = { white: { x: null, y: null }, yellow: { x: 5, y: 200 }, red: { x: 450, y: 225 } }; });
+  await p.click('#btnAiBalls');
+  await p.waitForFunction(() => /Claude가/.test(document.querySelector('#toast').textContent));
+  const msg = await p.textContent('#toast');
+  assert.match(msg, /Claude가 빨간공을/); assert.doesNotMatch(msg, /흰공|노란공/);
+  const after = await codeNums(p);
+  assert.deepEqual(after.v.slice(0, 4), before.v.slice(0, 4), '흰공·노란공은 그대로');
+  assert.deepEqual(after.v.slice(4), [1.422, 0.711]);
+  assert.equal(await p.$$eval('#status .pill.miss', e => e.length), 2);
+  const prompt = await p.evaluate(() => window.__jsonPrompt);
+  assert.match(prompt, /null/);
+  assert.doesNotMatch(prompt, /"x":0[,}]|"y":0[,}]/);
+  // 모두 빈 좌표면 못 찾았다고 알림
+  await p.evaluate(() => { window.__jsonAns = { white: { x: '', y: '' }, yellow: { x: 0, y: 0 }, red: null }; });
+  await p.click('#btnAiBalls');
+  await p.waitForFunction(() => /Claude도 공을 찾지 못했어요/.test(document.querySelector('#toast').textContent));
+  assert.deepEqual((await codeNums(p)).v, after.v);
   noErr(p); await p.context().close();
 });
