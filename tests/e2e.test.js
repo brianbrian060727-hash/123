@@ -1007,3 +1007,109 @@ test('E2E 60: 연습 문제 — 어제 점수는 새로 시작하고, 직접 쳐
   assert.equal(await p.textContent('#quizTally'), '오늘 1문제 중 1개 맞힘');
   noErr(p); await ctx.close();
 });
+
+// 첫 화면 메시지·사진 도움말·배치 코드 공유
+async function openSize(w, h) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, permissions: ['clipboard-read', 'clipboard-write'] });
+  const p = await ctx.newPage();
+  p.errors = []; p.on('pageerror', e => p.errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') p.errors.push(m.text()); });
+  await p.goto('file://' + page);
+  await p.waitForSelector('#solChips .chip:not(.skel)', { timeout: 30000 });
+  await p.evaluate(() => document.fonts.ready);
+  return p;
+}
+const pasteText = (p, sel, text) => p.evaluate(([sel, text]) => {
+  const dt = new DataTransfer(); dt.setData('text/plain', text);
+  document.querySelector(sel).dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+}, [sel, text]);
+test('E2E 61: 첫 화면은 공을 놓으면 길이 나온다고 말하고, 안내 카드가 낮아짐. 처음 무작위 배치하면 카드가 접힘', async () => {
+  const p = await openSize(400, 860);
+  assert.equal(await p.textContent('.brand span'), '공 위치만 놓으면 3쿠션 길을 계산해 줘요');
+  assert.equal(await p.textContent('#photoCard h2'), '공 3개만 놓으면, 득점 길이 나와요');
+  assert.equal(await p.$eval('#steps', e => e.tagName), 'P');
+  assert.match(await p.textContent('#steps'), /11만 번 넘게.*예시 배치예요/);
+  assert.equal(await p.getAttribute('#fileIn', 'aria-label'), '사진으로 공 위치 불러오기');
+  assert.equal(await p.$eval('#fileIn', e => e.previousElementSibling.classList.contains('primary')), false);
+  // 3단계 목록일 때는 카드 아래 끝이 330px였음
+  const bottom = await p.$eval('#photoCard', e => e.getBoundingClientRect().bottom);
+  assert.ok(bottom < 330, String(bottom));
+  // 처음 무작위 배치: 카드가 접힘. 다시 펼친 사람은 다음 무작위에도 그대로
+  await p.click('#layoutBox summary');
+  await p.click('#btnRandom');
+  assert.equal(await p.$eval('#photoCard', e => e.classList.contains('compact')), true);
+  assert.equal(await p.evaluate(() => localStorage.getItem('cue3-steps')), '0');
+  await p.click('#btnSteps');
+  await p.click('#btnRandom');
+  assert.equal(await p.$eval('#photoCard', e => e.classList.contains('compact')), false);
+  noErr(p); await p.context().close();
+});
+test('E2E 62: 360px에서 사진 버튼과 카메라 버튼이 한 줄이고 카드 밖으로 넘치지 않음', async () => {
+  const p = await openSize(360, 740);
+  const r = await p.evaluate(() => {
+    const b = s => document.querySelector(s).getBoundingClientRect();
+    const card = b('#photoCard'), pad = parseFloat(getComputedStyle(document.querySelector('#photoCard')).paddingRight);
+    return { gal: b('#fileIn').top, cam: b('#camIn').top, right: b('#camIn').right, inner: card.right - pad, sw: document.documentElement.scrollWidth };
+  });
+  assert.equal(r.cam, r.gal, JSON.stringify(r));
+  assert.ok(r.right <= r.inner + 0.5, JSON.stringify(r));
+  assert.equal(r.sw, 360);
+  noErr(p); await p.context().close();
+});
+test('E2E 63: 받은 배치 코드 글을 아무 데나 붙여넣으면 그 배치가 열리고, 복사 글에는 안내가 붙음', async () => {
+  const p = await openSize(400, 900);
+  const code = '3C-J-Y-0500-0400-1800-0900-1200-0300';
+  // 점수판에서 붙여넣어도 길 찾기로 돌아와 엶. 테이블·내 공도 코드대로
+  await p.click('.tabs [data-tab="score"]');
+  await pasteText(p, '#tabScore', `3쿠션 길잡이 배치 문제예요: ${code}\n(3쿠션 길잡이를 열고 아무 데나 붙여넣기 하세요)`);
+  assert.equal(await p.isVisible('#tabFind'), true);
+  assert.equal(await p.inputValue('#codeOut'), code);
+  assert.equal(await p.getAttribute('#segTable [data-v="jungdae"]', 'aria-pressed'), 'true');
+  assert.equal(await p.getAttribute('#segMy [data-v="yellow"]', 'aria-pressed'), 'true');
+  assert.equal(await p.getAttribute('#quickMy [data-v="yellow"]', 'aria-pressed'), 'true');
+  assert.equal(await p.textContent('#toast'), '받은 배치를 열었어요.');
+  assert.match(await p.textContent('#status'), /받은 배치/);
+  assert.deepEqual(JSON.parse(await p.evaluate(() => localStorage.getItem('cue3-settings'))).table, 'jungdae');
+  await p.waitForSelector('#solChips .chip:not(.skel)', { timeout: 30000 });
+  // 입력 칸에 붙여넣은 글은 건드리지 않음
+  await pasteText(p, '#saveName', '3C-D-W-0750-0950-2350-1150-1000-0075');
+  assert.equal(await p.inputValue('#codeOut'), code);
+  // 되돌리기 한 번이면 예시 배치로
+  await p.click('#btnUndo');
+  assert.equal(await p.isDisabled('#btnUndo'), true);
+  // 복사 글
+  await p.click('#layoutBox summary');
+  await p.click('#btnCopyCode');
+  const now = await p.inputValue('#codeOut');
+  assert.equal(await p.evaluate(() => navigator.clipboard.readText()), `3쿠션 길잡이 배치 문제예요: ${now}\n(3쿠션 길잡이를 열고 아무 데나 붙여넣기 하세요)`);
+  // '받은 코드 붙여넣기'는 접힌 문제집을 열고 코드 칸에 커서를 둠
+  await p.click('#layoutBox summary');
+  assert.equal(await p.$eval('#layoutBox', e => e.open), false);
+  await p.click('#btnPasteCode');
+  assert.equal(await p.$eval('#layoutBox', e => e.open), true);
+  assert.equal(await p.evaluate(() => document.activeElement.id), 'codeIn');
+  noErr(p); await p.context().close();
+});
+test('E2E 64: 사진 도움말은 사진 없이 공 놓기가 먼저, 찍는 법은 도움말 안, 아래 안내는 짧게. 사진으로 공을 찾으면 카드가 접힘', async () => {
+  const p = await open();
+  await p.click('#btnHelp');
+  assert.match(await p.textContent('ol.help > li:first-child'), /^사진 없이 공 놓기\s*바로 되는 방법/);
+  assert.equal(await p.$eval('#btnManual', e => e.closest('li') === document.querySelector('ol.help > li')), true);
+  assert.match(await p.textContent('#helpBrowser'), /링크를 복사해 삼성 인터넷이나 크롬 주소창에 붙여 넣으세요/);
+  assert.match(await p.textContent('#uploadHelp'), /찍는 법/);
+  const note = await p.textContent('#tabFind .note');
+  assert.doesNotMatch(note, /찍는 법/);
+  assert.match(note, /길 모양은 힘과 상관없이 계산하고/);
+  assert.equal(await p.$eval('#photoCard', e => e.classList.contains('compact')), false);
+  const dataUrl = await p.evaluate(() => {
+    const c = document.createElement('canvas'); c.width = 1000; c.height = 600; const g = c.getContext('2d');
+    g.fillStyle = '#4a2f1e'; g.fillRect(0, 0, 1000, 600); g.fillStyle = '#2158b8'; g.fillRect(100, 100, 800, 400);
+    return c.toDataURL('image/png');
+  });
+  await p.setInputFiles('#fileIn', { name: 't.png', mimeType: 'image/png', buffer: Buffer.from(dataUrl.split(',')[1], 'base64') });
+  await p.waitForSelector('#viewCorner:not([hidden])');
+  assert.equal(await p.$eval('#photoCard', e => e.classList.contains('compact')), false, '코너만 보고 있을 때는 그대로');
+  await p.click('#btnConfirm');
+  await p.waitForSelector('#viewTable:not([hidden])');
+  assert.equal(await p.$eval('#photoCard', e => e.classList.contains('compact')), true);
+  noErr(p); await p.context().close();
+});
