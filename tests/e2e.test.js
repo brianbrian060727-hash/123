@@ -526,7 +526,8 @@ test('E2E 38: 손가락으로 득점을 누른 뒤 리모컨 Enter는 공타, �
   await p.keyboard.press('Tab'); await p.focus('#scCopy'); await p.keyboard.press('Enter');
   assert.deepEqual(await scores(), ['1', '1']);
   assert.match(await p.textContent('#scInfo'), /선수 B 차례/);
-  assert.equal(await p.isVisible('#scMsg'), true);
+  // 복사 결과 글은 클립보드 응답 뒤에 뜸
+  await p.waitForSelector('#scMsg', { state: 'visible', timeout: 3000 });
   assert.deepEqual(p.errors, []);
   await ctx.close();
 });
@@ -1201,5 +1202,64 @@ test('E2E 68: 혼자 연습은 목표를 못 채우면 배지 없음, 채우면 
   // 혼자 연습 큰 화면도 숫자를 크게
   await p.click('#scBig');
   assert.ok(await p.$eval('#scBoard .sc-score b', e => parseFloat(getComputedStyle(e).fontSize)) > 120);
+  noErr(p); await p.context().close();
+});
+test('E2E 69: 우리 테이블 맞추기 — 아래 장쿠션을 누르면 회전 효과가 바뀌고 원래 공·모드로, 쿠션 반발과 저장한 테이블', async () => {
+  const p = await open();
+  const code = await p.inputValue('#codeOut');
+  await p.click('#settings summary');
+  assert.equal(await p.textContent('#cushOut'), '0.80');
+  assert.match(await p.textContent('#settings'), /필요한 힘 계산에만 쓰여요/);
+  // 그만두기: 공·모드·회전 효과 그대로
+  await p.click('#btnCalib');
+  assert.equal(await p.getAttribute('#mSys', 'aria-pressed'), 'true');
+  await p.click('#btnCalibCancel');
+  assert.equal(await p.getAttribute('#mRec', 'aria-pressed'), 'true');
+  assert.equal(await p.isVisible('#calibBox'), false);
+  assert.equal(await p.inputValue('#codeOut'), code);
+  // 1단계: 수구를 코너 50에 두고 위 장 3 줄을 강조
+  await p.click('#btnCalib');
+  assert.equal(await p.isVisible('#calibBox'), true);
+  assert.match(await p.textContent('#calibText'), /코너 50에서 위 장 다이아몬드 3\(30\)을 상단 .*2팁/);
+  assert.match(await p.textContent('#sysTable tr[aria-selected="true"]'), /위 장 3\.0/);
+  await p.$eval('#cvTable', c => c.scrollIntoView({ block: 'center' }));
+  const box = await p.$eval('#cvTable', c => { const r = c.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width }; });
+  const s = box.w / (2.844 + 0.3);
+  // 아래 장쿠션이 아닌 곳은 무시하고 계속 기다림
+  await p.mouse.click(box.x + (0.15 + 1.4) * s, box.y + (0.15 + 0.4) * s);
+  assert.equal(await p.isVisible('#calibBox'), true);
+  assert.equal(await p.textContent('#spinOut'), '×1.0');
+  // 2단계: 아래 장쿠션 1.75 포인트를 누르면 회전 효과를 맞추고 추천 공략으로 돌아옴
+  await p.mouse.click(box.x + (0.15 + 1.75 * 2.844 / 8) * s, box.y + (0.15 + 1.422 + 0.06) * s);
+  const out = await p.textContent('#spinOut');
+  assert.notEqual(out, '×1.0'); assert.match(out, /^×1\.[12]/);
+  assert.match(await p.textContent('#toast'), /회전 효과 ×1\.\d+로 맞췄어요/);
+  assert.equal(await p.getAttribute('#mRec', 'aria-pressed'), 'true');
+  assert.equal(await p.isVisible('#calibBox'), false);
+  assert.equal(await p.inputValue('#codeOut'), code);
+  assert.equal(JSON.parse(await p.evaluate(() => localStorage.getItem('cue3-settings'))).spinGain, +out.slice(1));
+  // 테이블 저장 → 상태 알약. 값을 바꾸면 알약이 빠지고, 다시 고르면 그 값으로
+  await p.fill('#tblName', '우리당구장 3번대'); await p.click('#btnTblSave');
+  assert.match(await p.textContent('#status'), /우리당구장 3번대/);
+  assert.equal(JSON.parse(await p.evaluate(() => localStorage.getItem('cue3-tables')))[0].name, '우리당구장 3번대');
+  const setEC = v => p.$eval('#cushIn', (e, v) => { e.value = v; e.dispatchEvent(new Event('input')); e.dispatchEvent(new Event('change')); }, v);
+  await setEC('0.85');
+  assert.equal(await p.textContent('#cushOut'), '0.85');
+  assert.doesNotMatch(await p.textContent('#status'), /우리당구장/);
+  await p.selectOption('#tblSel', '0');
+  assert.equal(await p.textContent('#cushOut'), '0.80');
+  assert.equal(await p.textContent('#spinOut'), out);
+  assert.match(await p.textContent('#status'), /우리당구장 3번대/);
+  // 쿠션 반발이 계산에 들어감: 시스템 표의 3쿠션 도착이 바뀜
+  await p.click('#mSys');
+  const row = () => p.textContent('#sysTable tr[aria-selected="true"] td:nth-child(2)');
+  const r1 = await row();
+  await setEC('0.9');
+  assert.notEqual(await row(), r1);
+  // 새로 열어도 저장한 보정값과 테이블이 남음
+  await p.selectOption('#tblSel', '0');
+  await p.reload(); await p.waitForSelector('#solChips .chip:not(.skel)', { timeout: 30000 });
+  assert.equal(await p.textContent('#spinOut'), out);
+  assert.match(await p.textContent('#status'), /우리당구장 3번대/);
   noErr(p); await p.context().close();
 });
