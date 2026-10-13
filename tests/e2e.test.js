@@ -237,7 +237,11 @@ test('E2E 22: 추천 길 칩에 길 그림, 조준해 보기로 직접 조준', 
 
 // ---------- 플랫폼 기능 흉내(window.claude) ----------
 const MOCK = `(() => {
-  const store = new Map(), subs = [];
+  // 다른 사람이 써 둔 문서는 window.__seed로 넣고, 저장소는 window.__store로 들여다봄
+  const store = new Map(Object.entries(window.__seed || {})), subs = [];
+  window.__store = store;
+  // 실제 플랫폼처럼 경로 조각은 ASCII 문법만 허용
+  const seg = p => { if (typeof p !== 'string' || !p.split('/').every(x => /^[A-Za-z0-9_\\-.~:@+]{1,200}$/.test(x))) throw new TypeError('bad path: ' + p); return p; };
   const snapDoc = (path) => ({ id: path.split('/').pop(), exists: store.has(path), data: () => store.get(path), metadata: { fromCache: false, hasPendingWrites: false } });
   const notify = () => subs.forEach(s => s.fire());
   const query = (coll, ord, lim) => ({
@@ -251,11 +255,11 @@ const MOCK = `(() => {
     if (lim) docs = docs.slice(0, lim);
     return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: {} };
   }
-  const doc = path => ({ id: path.split('/').pop(), path, get: async () => snapDoc(path),
-    set: async d => { store.set(path, JSON.parse(JSON.stringify(d))); window.__writes = (window.__writes || 0) + 1; notify(); },
+  const doc = path => seg(path) && ({ id: path.split('/').pop(), path, get: async () => snapDoc(path),
+    set: async d => { if (window.__failWrites) throw Object.assign(new Error('막힘'), { code: window.__failWrites }); store.set(path, JSON.parse(JSON.stringify(d))); window.__writes = (window.__writes || 0) + 1; notify(); },
     update: async d => { store.set(path, Object.assign({}, store.get(path), d)); notify(); }, delete: async () => { store.delete(path); notify(); },
     onSnapshot(next) { const s = { fire: () => next(snapDoc(path)) }; subs.push(s); setTimeout(s.fire, 0); return () => {}; } });
-  const db = { doc, collection: p => Object.assign(query(p), { path: p, doc: id => doc(p + '/' + (id || Math.random().toString(36).slice(2))) }) };
+  const db = { doc, collection: p => seg(p) && Object.assign(query(p), { path: p, doc: id => doc(p + '/' + (id || Math.random().toString(36).slice(2))) }) };
   const sample = async (input, o) => { window.__prompt = input; const t = '이 길은 두께가 넉넉해서 안전해요.'; o && o.onText && o.onText({ text: t, delta: t }); return { text: t, truncated: false }; };
   sample.json = async (input, o) => { window.__jsonImages = o && o.images && o.images.length; return { white: { x: 225, y: 150 }, yellow: { x: 675, y: 300 }, red: { x: 450, y: 225 } }; };
   sample.limits = async () => ({ maxPromptBytes: 262144, images: { maxCount: 4, maxInputBytes: 2e7, mediaTypes: ['image/jpeg'] } });
@@ -266,6 +270,8 @@ const MOCK = `(() => {
 })();`;
 async function openMock(opts = {}) {
   const ctx = await browser.newContext({ viewport: { width: opts.w || 400, height: opts.h || 900 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  if (opts.seed) await ctx.addInitScript(s => { window.__seed = s; }, opts.seed);
+  if (opts.local) await ctx.addInitScript(l => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); for (const k in l) localStorage.setItem(k, l[k]); } }, opts.local);
   await ctx.addInitScript(MOCK);
   const p = await ctx.newPage();
   p.errors = []; p.on('pageerror', e => p.errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') p.errors.push(m.text()); });
@@ -663,4 +669,110 @@ test('E2E 46: 파일 저장·복사가 모두 막히면 백업 내용을 버튼 
   assert.equal(await p.evaluate(() => document.activeElement.id), 'scBackupOut');
   assert.deepEqual(p.errors, []);
   await ctx.close();
+});
+
+// ---------- 클럽 기록 · 실시간 중계 견고화 ----------
+const clubGames = p => p.evaluate(() => [...window.__store.keys()].filter(k => k.startsWith('club/main/games/')));
+async function finishNamed(p, a, b) {
+  const n = await p.$$('#scPlayers input[data-k="name"]'); await n[0].fill(a); await n[1].fill(b);
+  const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('1'); await t[1].fill('1');
+  await p.click('#scStart'); await p.click('#scMiss'); await p.click('#scHit');
+}
+test('E2E 47: 악성 클럽 문서(숫자 칸 스크립트, 빈 선수, 미래 시각)가 있어도 스크립트가 돌지 않고 정상 중계가 보임', async () => {
+  const bad = n => `<img src=x onerror="window.__xss=${n}">`, now = Date.now();
+  const seed = {
+    'club/main/games/evil1': { id: 'evil1', d: now - 6e4, k: '3c', n: ['김철수', '이영희'], t: [2, bad(1)], s: [bad(2), 1], i: [1, bad(3)], h: [bad(4), 1], res: bad(5) },
+    'club/main/games/future': { id: 'future', d: 9e15, n: ['미래인', '이영희'], t: [2, 2], s: [2, 1], i: [1, 1], h: [1, 1], res: '미래인 승' },
+    'club/main/live/evil': { u: now, round: bad(6), turn: 0, players: [{ name: bad(7), score: bad(8), target: 2, inn: bad(9), high: 0 }] },
+    'club/main/live/nulls': { u: now, players: [null] },
+    'club/main/live/future': { u: 9e15, players: [{ name: '미래인', score: 1, target: 2, inn: 1, high: 1 }] },
+    'club/main/live/real': { u: now - 1000, done: false, round: 3, turn: 1, players: [{ name: '박정상', score: 5, target: 20, inn: 3, high: 2 }, { name: '최정상', score: 4, target: 20, inn: 2, high: 2 }] },
+    'club/main/live/fake': { id: 'real', u: now - 2000, players: [{ name: '가짜', score: 1, target: 2, inn: 1, high: 1 }] }
+  };
+  const p = await openMock({ hash: '#score', noWait: true, seed });
+  await p.waitForFunction(() => /박정상/.test(document.querySelector('#clubLive').textContent));
+  await p.waitForFunction(() => /김철수/.test(document.querySelector('#clubStats').textContent));
+  const live = await p.textContent('#clubLive');
+  assert.doesNotMatch(live, /미래인/); assert.doesNotMatch(await p.textContent('#clubHist'), /미래인/);
+  assert.doesNotMatch(await p.textContent('#clubStats'), /NaN|Infinity/);
+  // 문서 본문의 id가 다른 경기 id를 덮어쓰지 못함
+  assert.equal(await p.$$eval('#clubLive [data-watch="real"]', e => e.length), 1);
+  await p.click('#clubLive [data-watch="real"]');
+  await p.waitForFunction(() => /박정상/.test(document.querySelector('#clubWatch').textContent));
+  await p.click('#clubLive [data-watch="evil"]');
+  await p.waitForSelector('#clubWatch .sc-p');
+  assert.equal(await p.evaluate(() => document.querySelectorAll('img').length), 0);
+  assert.equal(await p.evaluate(() => window.__xss), undefined);
+  // 다른 사람 중계는 탭의 빨간 점과 점수판 맨 위 바로 가기로 알림
+  assert.equal(await p.$eval('#tabBtnScore', b => b.classList.contains('has-live')), true);
+  assert.match(await p.textContent('#clubLiveJump'), /지금 경기 중 \d+ · 보기/);
+  await p.evaluate(() => window.scrollTo(0, 0));
+  await p.click('#clubLiveJump');
+  assert.ok(await p.$eval('#clubLive', el => { const r = el.getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0; }));
+  noErr(p); await p.context().close();
+});
+test('E2E 48: 이 기기 기록 올리기 — id 없는 한글 이름 기록도 올라가고, 혼자 연습·기본 이름 기록은 건너뜀', async () => {
+  const now = Date.now(), hist = [
+    { d: now - 6e4, k: '3c', n: ['김철수', '이영희'], t: [20, 20], s: [20, 15], i: [10, 10], h: [5, 3], res: '김철수 승' },
+    { d: now - 12e4, k: '3c', n: ['선수 A', '선수 B'], t: [20, 20], s: [20, 1], i: [10, 10], h: [5, 1], res: '선수 A 승' },
+    { id: 'solo1', d: now - 18e4, k: '3c', n: ['박민수'], t: [20], s: [12], i: [20], h: [3], res: '박민수 12점' }
+  ];
+  const p = await openMock({ hash: '#score', noWait: true, local: { 'cue3-history': JSON.stringify(hist) } });
+  await p.waitForSelector('#clubWriteRow:not([hidden])');
+  await p.click('#clubUpAll');
+  await p.waitForFunction(() => /1개 올림/.test(document.querySelector('#toast').textContent));
+  const keys = await clubGames(p);
+  assert.equal(keys.length, 1); assert.match(keys[0], /^club\/main\/games\/h[0-9a-z]+-[0-9a-z]+$/);
+  assert.deepEqual(await p.evaluate(k => window.__store.get(k).n, keys[0]), ['김철수', '이영희']);
+  assert.equal(await p.isDisabled('#clubUpAll'), false);
+  await p.waitForFunction(() => /김철수/.test(document.querySelector('#clubStats').textContent));
+  // 다시 눌러도 같은 id라 두 번 올라가지 않음
+  await p.click('#clubUpAll');
+  await p.waitForFunction(() => /올릴 새 경기가 없어요/.test(document.querySelector('#toast').textContent));
+  assert.equal((await clubGames(p)).length, 1);
+  noErr(p); await p.context().close();
+});
+test('E2E 49: 클럽 — 기본 이름 경기는 안 올리고, 끝난 경기를 되돌리면 클럽 기록도 지우고, 접은 경기는 중계에 중단으로 남김', async () => {
+  const p = await openMock({ hash: '#score', noWait: true });
+  await p.waitForSelector('#clubWriteRow:not([hidden])');
+  assert.equal(await p.isChecked('#clubAuto'), true);
+  await p.check('#scLive');
+  const t = await p.$$('#scPlayers input[data-k="target"]'); await t[0].fill('1'); await t[1].fill('1');
+  await p.click('#scStart'); await p.click('#scMiss'); await p.click('#scHit');
+  await p.waitForFunction(() => /이름을 적은 2인 이상/.test(document.querySelector('#toast').textContent));
+  assert.equal((await clubGames(p)).length, 0);
+  await p.click('#scNew');
+  await finishNamed(p, '김철수', '이영희');
+  await p.waitForFunction(() => [...window.__store.keys()].some(k => k.startsWith('club/main/games/')));
+  await p.click('#scUndo');
+  await p.waitForFunction(() => ![...window.__store.keys()].some(k => k.startsWith('club/main/games/')));
+  // 되돌린 경기를 끝내지 않고 접으면 중계 문서는 '중단'으로 닫힘
+  await p.click('#scNew'); await p.click('#scNew');
+  await p.waitForFunction(() => [...window.__store.entries()].some(([k, v]) => k.startsWith('club/main/live/') && v.done === true && v.res === '중단'));
+  await p.waitForFunction(() => /중단/.test(document.querySelector('#clubLive').textContent));
+  // 내 기기 중계는 바로 가기·빨간 점 대상이 아님
+  assert.equal(await p.isVisible('#clubLiveJump'), false);
+  assert.equal(await p.$eval('#tabBtnScore', b => b.classList.contains('has-live')), false);
+  // 자동 올리기 해제는 다음 방문에도 유지
+  await p.uncheck('#clubAuto');
+  await p.reload(); await p.waitForSelector('#clubWriteRow:not([hidden])');
+  assert.equal(await p.isChecked('#clubAuto'), false);
+  noErr(p); await p.context().close();
+});
+test('E2E 50: 클럽 기록을 못 올리면 알려 주고, 이 기기 기록 올리기로 다시 올림', async () => {
+  const p = await openMock({ hash: '#score', noWait: true });
+  await p.waitForSelector('#clubWriteRow:not([hidden])');
+  await p.evaluate(() => { window.__failWrites = 'internal'; });
+  await finishNamed(p, '김철수', '이영희');
+  await p.waitForFunction(() => /클럽 기록에 못 올렸어요/.test(document.querySelector('#toast').textContent));
+  const pend = await p.evaluate(() => JSON.parse(localStorage.getItem('cue3-club-pending')));
+  assert.equal(pend.length, 1);
+  // 권한 문제가 아니므로 보기 전용으로 바뀌지 않음
+  assert.match(await p.textContent('#clubStatus'), /함께 쓰는/);
+  await p.evaluate(() => { window.__failWrites = ''; });
+  await p.click('#clubUpAll');
+  await p.waitForFunction(() => /1개 올림/.test(document.querySelector('#toast').textContent));
+  assert.deepEqual(await p.evaluate(() => JSON.parse(localStorage.getItem('cue3-club-pending'))), []);
+  assert.equal(await p.evaluate(id => window.__store.has('club/main/games/' + id), pend[0]), true);
+  noErr(p); await p.context().close();
 });

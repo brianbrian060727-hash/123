@@ -255,7 +255,7 @@ input[type="range"] { width: 170px; accent-color: var(--accent); }
 #scKeyStep { font-size: 15px; font-weight: 600; }
 #scKeyStep kbd { font-family: var(--f-num); }
 /* 큰 화면: 점수만 크게 */
-body.focus .bar, body.focus .tabs, body.focus #scSide, body.focus #scLogWrap, body.focus #scNote { display: none !important; }
+body.focus .bar, body.focus .tabs, body.focus #scSide, body.focus #scLogWrap, body.focus #scNote, body.focus #clubLiveJump { display: none !important; }
 body.focus #scGame .sc-score b { font-size: clamp(72px, 18vw, 160px); }
 body.focus #scGame .pname { font-size: clamp(18px, 3.5vw, 30px); }
 body.focus .btn.big { min-height: 84px; font-size: 20px; }
@@ -349,6 +349,8 @@ details.settings { box-shadow: var(--shadow); }
 @keyframes pulse { 50% { opacity: 0.3; } }
 .live-dot { animation: pulse 1.4s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+/* 다른 사람이 중계 중이면 점수판 탭에 빨간 점 */
+.tabs button.has-live { position: relative; } .tabs button.has-live::after { content: ''; position: absolute; top: 6px; right: 4px; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
 
 /* 떠 있는 알림 */
 #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 40;
@@ -378,6 +380,7 @@ details.settings { box-shadow: var(--shadow); }
   .tabs button { flex: 1; flex-direction: column; gap: 2px; font-size: 11.5px; padding: 6px 4px; border-bottom: 0; margin: 0; border-radius: 12px; }
   .tabs button svg { width: 22px; height: 22px; }
   .tabs button[aria-selected="true"] { color: var(--accent); background: var(--accent-soft); }
+  .tabs button.has-live::after { top: 4px; right: auto; left: calc(50% + 9px); }
   .wrap { padding-bottom: calc(var(--nav-h) + 28px + env(safe-area-inset-bottom, 0px)); }
   #toast { bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom, 0px)); }
 }
@@ -585,6 +588,7 @@ details.settings { box-shadow: var(--shadow); }
 
   <!-- 점수판 -->
   <section id="tabScore" class="col" hidden>
+    <button type="button" class="linkish" id="clubLiveJump" hidden></button>
     <div class="panel" id="scSetup">
       <div class="panel-head"><h2>경기 설정</h2><span class="sub">1명은 혼자 연습, 2~6명은 개인전</span></div>
       <div class="set-row"><label>종목</label>
@@ -2699,7 +2703,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     }).join('')}</table>${h2hHtml}` : `<p class="sub" style="margin:0">${empty}</p>`;
   }
   // 점수판 → 클럽 기록 연결 고리 (클럽 기능이 켜질 때 채워짐)
-  const hooks = { onDone: null, onLive: null, onUndoDone: null };
+  const hooks = { onDone: null, onLive: null, onUndoDone: null, onAbandon: null };
 
   // ---------- 점수판 ----------
   const Score = (() => {
@@ -2987,7 +2991,11 @@ if (typeof module !== 'undefined') module.exports = Core;
       delete b.dataset.armed; b.textContent = '새 경기';
       newGame();
     });
-    const newGame = () => { g = null; undo = []; clearInterval(clk.timer); clk.timer = 0; clk.hold = null; keepAwake(false); setFocus(false); msg(''); prevScores = []; render(); renderHist(); window.scrollTo(0, 0); };
+    const newGame = () => {
+      // 끝내지 않고 접은 경기는 중계에서 '중단'으로 닫음
+      if (g && !g.done && cfg.live && hooks.onAbandon) hooks.onAbandon(g);
+      g = null; undo = []; clearInterval(clk.timer); clk.timer = 0; clk.hold = null; keepAwake(false); setFocus(false); msg(''); prevScores = []; render(); renderHist(); window.scrollTo(0, 0);
+    };
     function setFocus(on) {
       document.body.classList.toggle('focus', on);
       $('#scBig').textContent = on ? '작은 화면' : '큰 화면';
@@ -3238,27 +3246,63 @@ if (typeof module !== 'undefined') module.exports = Core;
   // ---------- 클럽 기록 · 실시간 중계 (공유 저장소) ----------
   const Club = (() => {
     let db = null, canWrite = false, myId = null, games = [], lives = [], watchId = null;
-    let liveBusy = false, livePending = null;
+    let liveBusy = false, livePending = null, paused = false, warnedName = false;
     const GAMES = 'club/main/games', LIVE = 'club/main/live';
+    const PKEY = 'cue3-club-pending', AKEY = 'cue3-club-auto';
+    // 이번 방문에 이 기기가 올린 경기 · 중계 id, 올리는 사이에 되돌린 경기 id
+    const mine = new Set(), myLive = new Set(), undone = new Set();
     const status = t => { $('#clubStatus').textContent = t; };
+    // 못 올린 경기 id: 다음 '이 기기 기록 올리기' 때 다시 올림
+    const pend = () => { try { const a = JSON.parse(localStorage.getItem(PKEY) || '[]'); return Array.isArray(a) ? a.filter(x => typeof x === 'string').slice(0, 100) : []; } catch (e) { return []; } };
+    const setPend = a => { try { localStorage.setItem(PKEY, JSON.stringify(a.slice(0, 100))); } catch (e) { /* 무시 */ } };
+    // 클럽에는 이름을 적은 2인 이상 경기만
+    const clubable = r => r.n.length >= 2 && !r.n.some(n => DEFNAME.test(n));
+    // 문서 경로는 ASCII만 됨: 한글 이름 기록은 날짜+이름 해시로 id를 만듦
+    const fnv36 = t => { let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(36); };
+    const upId = r => /^[A-Za-z0-9_-]{1,60}$/.test(r.id) ? r.id : 'h' + N(r.d).toString(36) + '-' + fnv36(r.n.join('|'));
+    function cleanLive(id, l) {
+      if (!l || !Array.isArray(l.players)) return null;
+      const players = l.players.filter(p => p && typeof p === 'object').slice(0, 6).map(p => ({ name: S(p.name, 24), target: N(p.target), score: N(p.score), inn: N(p.inn), high: N(p.high) }));
+      if (!players.length) return null;
+      const u = N(l.u); if (u > Date.now() + 60e3) return null;
+      return { id: S(id, 80), u, done: !!l.done, round: N(l.round), turn: N(l.turn), res: S(l.res, 80), players };
+    }
     function render() {
       $('#clubStats').innerHTML = statsHtml(games, '아직 클럽 기록이 없어요. 경기를 끝내면 여기에 모여요.');
       $('#clubHist').innerHTML = histHtml(games, '아직 없어요.');
     }
-    function liveFresh() { const now = Date.now(); return lives.filter(l => now - (l.u || 0) < (l.done ? 15 * 60e3 : 3 * 3600e3)); }
+    // 미래 시각은 고정되지 않게 절댓값, 버려진 경기는 30분 뒤 숨김
+    function liveFresh() { const now = Date.now(); return lives.filter(l => { const age = Math.abs(now - l.u); return age < (l.done ? 15 * 60e3 : 30 * 60e3); }); }
+    const card = l => `<div class="live-card"><div>${l.done ? '' : '<span class="live-dot" aria-hidden="true"></span>'}${l.players.map(p => `${esc(p.name)} <b class="num">${esc(p.score)}</b>`).join(' · ')} <span class="sub">${l.done ? (l.res === '중단' ? '중단' : '경기 끝') : `${esc(l.round)}이닝`}</span></div><button type="button" class="mini" data-watch="${esc(l.id)}">${watchId === l.id ? '닫기' : '보기'}</button></div>`;
     function renderLive() {
       const ls = liveFresh();
-      $('#clubLive').innerHTML = ls.length ? `<span class="lbl">지금 진행 중</span><div class="col" style="gap:8px">${ls.map(l => `<div class="live-card"><div>${l.done ? '' : '<span class="live-dot" aria-hidden="true"></span>'}${l.players.map(p => `${esc(p.name)} <b class="num">${p.score}</b>`).join(' · ')} <span class="sub">${l.done ? '경기 끝' : `${l.round}이닝`}</span></div><button type="button" class="mini" data-watch="${esc(l.id)}">${watchId === l.id ? '닫기' : '보기'}</button></div>`).join('')}</div>` : '';
+      const cards = ls.map(l => { try { return card(l); } catch (e) { return ''; } }).join('');
+      $('#clubLive').innerHTML = ls.length ? `<span class="lbl">지금 진행 중</span><div class="col" style="gap:8px">${cards}</div>` : '';
       const w = ls.find(l => l.id === watchId);
-      $('#clubWatch').innerHTML = w ? `<div class="sc-board">${w.players.map((p, i) => `<div class="sc-p${!w.done && i === w.turn ? ' on' : ''}"><div class="pname"><span>${esc(p.name)}</span>${!w.done && i === w.turn ? '<span class="badge">차례</span>' : ''}</div><div class="sc-score"><b>${p.score}</b><span class="tgt">/ ${p.target}</span></div><div class="sc-stats"><span>이닝 <span class="num">${p.inn}</span></span><span>에버 <span class="num">${av3(p.score, p.inn)}</span></span><span>하이런 <span class="num">${p.high}</span></span></div></div>`).join('')}</div>${w.done ? `<p class="sub">${esc(w.res || '')}</p>` : ''}` : '';
+      let wh = '';
+      try {
+        wh = w ? `<div class="sc-board">${w.players.map((p, i) => `<div class="sc-p${!w.done && i === w.turn ? ' on' : ''}"><div class="pname"><span>${esc(p.name)}</span>${!w.done && i === w.turn ? '<span class="badge">차례</span>' : ''}</div><div class="sc-score"><b>${esc(p.score)}</b><span class="tgt">/ ${esc(p.target)}</span></div><div class="sc-stats"><span>이닝 <span class="num">${esc(p.inn)}</span></span><span>에버 <span class="num">${esc(av3(p.score, p.inn))}</span></span><span>하이런 <span class="num">${esc(p.high)}</span></span></div></div>`).join('')}</div>${w.done ? `<p class="sub">${esc(w.res)}</p>` : ''}` : '';
+      } catch (e) { wh = ''; }
+      $('#clubWatch').innerHTML = wh;
+      // 다른 기기가 중계 중인 경기: 탭에 빨간 점, 점수판 맨 위에 바로 가기
+      const n = ls.filter(l => !l.done && !myLive.has(l.id)).length, tb = $('#tabBtnScore'), j = $('#clubLiveJump');
+      tb.classList.toggle('has-live', n > 0);
+      if (n) tb.setAttribute('aria-label', '점수판 · 지금 경기 중'); else tb.removeAttribute('aria-label');
+      j.hidden = !n; j.textContent = n ? `지금 경기 중 ${n} · 보기` : '';
     }
     $('#clubLive').addEventListener('click', e => { const b = e.target.closest('[data-watch]'); if (!b) return; watchId = watchId === b.dataset.watch ? null : b.dataset.watch; renderLive(); });
+    $('#clubLiveJump').addEventListener('click', () => $('#clubLive').scrollIntoView({ block: 'start' }));
     async function write(path, data) {
-      if (!db || !canWrite) return false;
+      if (!db || !canWrite || paused) return false;
       try { await db.doc(path).set(data); return true; }
-      catch (e) {
-        if (e && e.code === 'unavailable') { await new Promise(r => setTimeout(r, 400 + Math.random() * 600)); try { await db.doc(path).set(data); return true; } catch (e2) { /* 아래 */ } }
+      catch (e0) {
+        // 경로 문법 오류는 이 기록만의 문제: 권한과 상관없음
+        if (e0 instanceof TypeError) return false;
+        let e = e0;
+        if (e && e.code === 'unavailable') { await new Promise(r => setTimeout(r, 400 + Math.random() * 600)); try { await db.doc(path).set(data); return true; } catch (e2) { e = e2; } }
         if (e && (e.code === 'invalid_argument' || e.code === 'not_granted' || e.code === 'revoked')) { canWrite = false; applyWrite(); }
+        // 요청 한도: 이번 방문 동안 자동 올리기·중계를 쉬고 한 번만 알림
+        if (e && e.code === 'resource_exhausted') { paused = true; toast('클럽 저장 요청이 너무 많아서 이번에는 올리기를 쉬어요. 기록은 이 기기에 남아요.', 'warn'); }
         if (e && e.code === 'quota_exceeded') toast('클럽 기록 저장 공간이 가득 찼어요. 오래된 경기를 정리해야 해요.', 'warn');
         return false;
       }
@@ -3266,33 +3310,68 @@ if (typeof module !== 'undefined') module.exports = Core;
     function applyWrite() {
       $('#clubWriteRow').hidden = !canWrite;
       $('#scLiveRow').hidden = !canWrite;
-      status(canWrite ? '함께 쓰는 기록이에요' : '보기 전용: 기록 올리기는 이 링크의 참여자(Contributor) 이상만 할 수 있어요');
+      status(canWrite ? '함께 쓰는 기록이에요' : '보기 전용: 편집 권한이 있는 사람만 기록을 올릴 수 있어요');
     }
     async function onDone(rec) {
       if (!canWrite || !$('#clubAuto').checked) return;
-      const ok = await write(`${GAMES}/${rec.id}`, Object.assign({}, rec, { by: myId }));
-      if (ok) toast('클럽 기록에 올렸어요.', 'info');
+      const r = cleanGame(rec); if (!r) return;
+      if (!clubable(r)) {
+        if (!warnedName) { warnedName = true; toast('이름을 적은 2인 이상 경기만 클럽 기록에 올라가요', 'info'); }
+        return;
+      }
+      const id = upId(r);
+      undone.delete(id);
+      const ok = await write(`${GAMES}/${id}`, Object.assign(r, { id, by: myId }));
+      if (undone.has(id)) { if (ok) drop(id); return; }
+      if (ok) {
+        mine.add(id); setPend(pend().filter(x => x !== id));
+        toast('클럽 기록에 올렸어요.', 'info');
+      } else {
+        setPend([id].concat(pend().filter(x => x !== id)));
+        if (canWrite) toast('클럽 기록에 못 올렸어요. 「이 기기 기록 올리기」로 다시 올릴 수 있어요.', 'warn');
+      }
     }
-    async function onLive(g) {
-      const body = { u: Date.now(), by: myId, k: g.kind || '3c', done: g.done, round: g.round, turn: g.turn, res: g.done ? Core.score.result(g) : '',
-        players: g.players.map(p => ({ name: p.name, target: p.target, score: p.score, inn: p.inn, high: p.high })) };
-      if (liveBusy) { livePending = [g.id, body]; return; }
+    const liveBody = g => ({ u: Date.now(), by: myId, k: g.kind || '3c', done: g.done, round: g.round, turn: g.turn, res: g.done ? Core.score.result(g) : '',
+      players: g.players.map(p => ({ name: p.name, target: p.target, score: p.score, inn: p.inn, high: p.high })) });
+    // 중계 쓰기는 한 번에 하나씩, 밀린 건 마지막 것만
+    async function sendLive(id, body) {
+      myLive.add(id);
+      if (liveBusy) { livePending = [id, body]; return; }
       liveBusy = true;
-      let job = [g.id, body];
+      let job = [id, body];
       while (job) { await write(`${LIVE}/${job[0]}`, job[1]); job = livePending; livePending = null; }
       liveBusy = false;
     }
+    const onLive = g => { if (g.id) sendLive(g.id, liveBody(g)); };
+    const onAbandon = g => { if (g.id) sendLive(g.id, Object.assign(liveBody(g), { done: true, res: '중단' })); };
+    // 끝난 경기를 되돌리면 이번에 올린 클럽 기록도 지움
+    const drop = id => { try { db.doc(`${GAMES}/${id}`).delete().catch(() => {}); } catch (e) { /* 무시 */ } };
+    function onUndoDone(id) {
+      undone.add(id);
+      if (mine.has(id)) drop(id);
+      mine.delete(id);
+      setPend(pend().filter(x => x !== id));
+    }
+    try { if (localStorage.getItem(AKEY) === '0') $('#clubAuto').checked = false; } catch (e) { /* 기본: 켬 */ }
+    $('#clubAuto').addEventListener('change', e => { try { localStorage.setItem(AKEY, e.target.checked ? '1' : '0'); } catch (err) { /* 무시 */ } });
     $('#clubUpAll').addEventListener('click', async e => {
       const b = e.currentTarget; b.disabled = true;
-      const have = new Set(games.map(r => r.id));
-      let n = 0;
-      for (const r of Score.localHistory().slice(0, 200)) {
-        const id = r.id || `${r.d.toString(36)}-${r.n.join('-').replace(/[^0-9A-Za-z가-힣_-]/g, '').slice(0, 40) || 'x'}`;
-        if (have.has(id)) continue;
-        if (await write(`${GAMES}/${id}`, Object.assign({}, r, { id, by: myId }))) n++;
-      }
-      b.disabled = false;
-      toast(n ? `경기 ${n}개를 클럽 기록에 올렸어요.` : '올릴 새 경기가 없어요.', 'info');
+      paused = false; // 직접 누르면 한 번 더 시도
+      try {
+        const have = new Set(games.map(r => r.id)), pending = new Set(pend()), left = [];
+        let ok = 0, fail = 0, skip = 0;
+        const all = Score.localHistory();
+        for (let k = 0; k < all.length; k++) {
+          const r = all[k], id = upId(r);
+          if (k >= 200 && !pending.has(id)) continue;
+          if (!clubable(r)) { skip++; continue; }
+          if (have.has(id)) continue;
+          if (await write(`${GAMES}/${id}`, Object.assign(cleanGame(r), { id, by: myId }))) { ok++; mine.add(id); }
+          else { fail++; left.push(id); }
+        }
+        setPend(left);
+        toast(ok || fail ? `클럽 기록에 ${ok}개 올림${fail ? ` · ${fail}개 실패` : ''}` : skip ? '올릴 새 경기가 없어요. 이름을 적은 2인 이상 경기만 올라가요.' : '올릴 새 경기가 없어요.', fail ? 'warn' : 'info');
+      } finally { b.disabled = false; }
     });
     (async () => {
       try { db = window.claude && window.claude.use ? await window.claude.use('db') : null; } catch (e) { db = null; }
@@ -3304,15 +3383,15 @@ if (typeof module !== 'undefined') module.exports = Core;
       myId = user ? await user.id() : null;
       $('#clubPanel').hidden = false; applyWrite(); render();
       db.collection(GAMES).orderBy('d', 'desc').limit(300).onSnapshot(sn => {
-        games = sn.docs.map(d => d.data()).filter(r => r && Array.isArray(r.n) && Array.isArray(r.s) && Array.isArray(r.i) && Array.isArray(r.t) && Array.isArray(r.h));
+        games = sn.docs.map(d => cleanGame(d.data())).filter(Boolean);
         render();
       }, () => status('클럽 기록을 불러오지 못했어요. 새로 고침해 주세요.'));
       db.collection(LIVE).orderBy('u', 'desc').limit(20).onSnapshot(sn => {
-        lives = sn.docs.map(d => Object.assign({ id: d.id }, d.data())).filter(l => Array.isArray(l.players));
+        lives = sn.docs.map(d => cleanLive(d.id, d.data())).filter(Boolean);
         renderLive();
       }, () => {});
       setInterval(renderLive, 60e3);
-      hooks.onDone = onDone; hooks.onLive = onLive;
+      hooks.onDone = onDone; hooks.onLive = onLive; hooks.onUndoDone = onUndoDone; hooks.onAbandon = onAbandon;
     })();
     return {};
   })();
