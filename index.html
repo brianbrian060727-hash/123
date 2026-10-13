@@ -108,6 +108,17 @@ body.dropping .wrap { outline: 2px dashed var(--accent); outline-offset: -6px; b
 .hint { margin: 0; font-size: 13px; color: var(--muted); }
 .stage-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
 .stage-foot .hint { flex: 1 1 220px; min-width: 0; }
+#solDetail { scroll-margin-top: 12px; }
+/* 당구대 바로 아래 한 줄 요약: 두께·당점·힘 */
+.shot-strip { position: relative; flex: 1 1 100%; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); font-size: 13px; }
+.shot-strip[hidden] { display: none; }
+.shot-strip .hd { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding-right: 52px; }
+.shot-strip .it { display: inline-flex; align-items: center; gap: 6px; }
+.shot-strip .it svg { width: 24px; height: 24px; flex: none; }
+.shot-strip .thk svg { width: 51px; margin-inline: -4px -6px; }
+.shot-strip .pips { margin-right: 0; }
+.shot-strip .pips i:not(.on) { background: color-mix(in srgb, var(--muted) 30%, transparent); }
+.shot-strip > .linkish { position: absolute; top: 4px; right: 6px; padding: 6px 4px; }
 .stage-btns { display: flex; gap: 8px; }
 .btn.sm { min-height: 36px; padding: 6px 12px; font-size: 13px; }
 .btn.sm svg { width: 15px; height: 15px; }
@@ -471,6 +482,7 @@ details.settings { box-shadow: var(--shadow); }
       <div class="row-inline"><button type="button" class="btn sm primary" id="btnAiBalls">Claude로 공 찾기</button></div>
     </div>
     <div class="stage-foot">
+      <div class="shot-strip" id="recStrip" aria-live="polite" hidden></div>
       <p class="hint" id="tableHint">공을 끌어서 위치를 고칠 수 있어요. 놓으면 길을 다시 계산합니다.</p>
       <div class="stage-btns">
         <button type="button" class="btn sm" id="btnUndo" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>되돌리기</button>
@@ -1525,30 +1537,43 @@ if (typeof module !== 'undefined') module.exports = Core;
   }
 
   // ---------- 계산(워커) ----------
-  let worker = null;
+  // 워커가 일하는 동안 온 요청은 하나로 합쳐 끝난 뒤 최신 배치로 한 번만 계산
+  let worker = null, busy = false, pending = false;
   try {
     const src = document.getElementById('engine-src').textContent +
-      '\nself.onmessage=function(e){var r=Engine.solve(e.data.o);self.postMessage({id:e.data.id,list:r.list.map(function(s){return{rec:s.rec,E:s.E,vk:s.vk,theta:s.theta,width:s.width,tolMM:s.tolMM,V0:s.V0,pw:s.pw,risk:{kiss:s.risk.kiss,objHit:s.risk.objHit,objPts:s.risk.objPts},spinOK:s.spinOK,score:s.score,sig:s.sig};})});};';
+      '\nself.onmessage=function(e){var r=Engine.solve(e.data.o,{top:10});self.postMessage({id:e.data.id,list:r.list.map(function(s){return{rec:s.rec,E:s.E,vk:s.vk,theta:s.theta,width:s.width,tolMM:s.tolMM,ease:s.ease,V0:s.V0,pw:s.pw,risk:{kiss:s.risk.kiss,objHit:s.risk.objHit,objPts:s.risk.objPts},spinOK:s.spinOK,score:s.score,sig:s.sig};})});};';
     worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
-    worker.onmessage = e => { if (e.data.id === state.solveId) finishSolve(e.data.list); };
-    worker.onerror = () => { worker = null; solveMain(state.solveId); };
+    worker.onmessage = e => {
+      busy = false;
+      if (pending) { pending = false; busy = true; worker.postMessage({ id: state.solveId, o: ctxObj() }); return; }
+      if (e.data.id === state.solveId) finishSolve(e.data.list);
+    };
+    worker.onerror = e => { e.preventDefault(); worker = null; busy = pending = false; solveMain(state.solveId); };
   } catch (e) { worker = null; }
 
   function solveMain(id) {
     setTimeout(() => {
-      const r = Engine.solve(ctxObj());
+      if (id !== state.solveId) return;
+      const r = Engine.solve(ctxObj(), { top: 10 });
       if (id === state.solveId) finishSolve(r.list);
     }, 20);
   }
   function requestSolve() {
     stopAnim(); if (state.mode === 'sys') { state.sys.rows = Engine.sysTable(ctxObj(), { rail: state.sys.rail, E: state.sys.tip, flip: state.sys.flip, auto: true, vk: 0 }); renderSys(); } if (typeof renderCode === 'function') renderCode();
-    state.solving = true; state.solveId++;
-    renderStatus(); renderRec();
-    if (worker) worker.postMessage({ id: state.solveId, o: ctxObj() });
-    else solveMain(state.solveId);
+    // 지난 길을 새 배치의 공 이름·조준점으로 보여 주지 않게 바로 비움
+    state.solving = true; state.solveId++; state.sols = []; state.sel = 0;
+    renderStatus(); renderRec(); if (state.mode === 'rec') drawTable();
+    if (!worker) { solveMain(state.solveId); return; }
+    if (busy) { pending = true; return; }
+    busy = true; worker.postMessage({ id: state.solveId, o: ctxObj() });
   }
   function finishSolve(list) {
-    state.sols = list; state.sel = 0; state.solving = false; state.revealed = false;
+    // 같은 이름·같은 첫 적구 길은 2개까지. 허용 오차 2mm 미만 길은 3개를 채울 때만 남김
+    const cnt = {};
+    const out = list.filter(s => { const k = routeName(s.rec).name + '|' + (s.rec.contact ? s.rec.contact.idx : -1); cnt[k] = (cnt[k] || 0) + 1; return cnt[k] <= 2; });
+    const keep = new Set(out.filter(s => s.tolMM >= 2));
+    for (const s of out) if (keep.size < 3) keep.add(s);
+    state.sols = out.filter(s => keep.has(s)).slice(0, 6); state.sel = 0; state.solving = false; state.revealed = false;
     renderStatus(); renderRec(); drawTable();
   }
 
@@ -1564,6 +1589,8 @@ if (typeof module !== 'undefined') module.exports = Core;
     const fr = [[7 / 8, '7/8'], [3 / 4, '3/4'], [5 / 8, '5/8'], [1 / 2, '1/2'], [3 / 8, '3/8'], [1 / 4, '1/4'], [1 / 8, '1/8']];
     let best = fr[0];
     for (const f of fr) if (Math.abs(f[0] - t) < Math.abs(best[0] - t)) best = f;
+    // 분수와 3% 넘게 차이 나면 '3/8 두께 (43%)'처럼 어긋나 보이지 않게 풀어 씀
+    if (Math.abs(best[0] - t) > 0.03) return `${best[1]}보다 조금 ${t < best[0] ? '얇게' : '두껍게'}`;
     return best[1] + ' 두께';
   }
   function aimText(rec) {
@@ -1593,10 +1620,23 @@ if (typeof module !== 'undefined') module.exports = Core;
       <circle r="${r}" fill="var(--ball-${objKey(c.idx)})" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
       <circle cx="${off}" r="${r}" fill="var(--ball-${state.myBall})" fill-opacity="0.45" stroke="var(--accent)" stroke-width="1.6" stroke-dasharray="3 2.5"/></svg>`;
   }
+  // 숫자 뒤 조사: 끝자리를 읽을 때 받침이 있으면(영·일·삼·육·칠·팔) '을'
+  const eul = n => '013678'.includes(String(n).slice(-1)) ? '을' : '를';
+  // 겨냥선이 다이아몬드 줄과 만나는 곳. 코너 블록을 지나면 좌표가 코너로 잘리므로
+  // 쿠션에 닿는 레일 쪽 숫자로 읽음(오른쪽 단 0.0 대신 위 장 8.0)
+  function diaFor(C, rec, hit) {
+    const d = Engine.diamondHit(C, rec.theta);
+    if (!d || !hit || d.rail === hit.rail) return d;
+    const corner = (d.x <= 0 || d.x >= C.W) && (d.y <= 0 || d.y >= C.H);
+    return corner ? { rail: hit.rail, x: d.x, y: d.y } : d;
+  }
+  // 겨냥은 레일 위 다이아몬드, 괄호 안은 공이 쿠션에 실제로 닿는 곳
   function aimPointText(rec) {
     if (!rec.evs.length || rec.evs[0].type !== 'b') return '';
-    const h = Engine.railHit(Engine.makeCtx(ctxObj()), rec.theta);
-    return h ? `<div class="sub">겨냥선을 쭉 이으면 ${RAILNAME[h.rail]}쿠션 <span class="num">${railPoint(h)}</span> 포인트</div>` : '';
+    const C = Engine.makeCtx(ctxObj());
+    const h = Engine.railHit(C, rec.theta), d = diaFor(C, rec, h);
+    if (!d || !h) return '';
+    return `<div class="sub">겨냥선을 쭉 이으면 ${RAILNAME[d.rail]}쿠션 다이아몬드 <span class="num">${railPoint(d)}</span> (쿠션에 닿는 곳 ${h.rail !== d.rail ? RAILNAME[h.rail] + '쿠션 ' : ''}<span class="num">${railPoint(h)}</span>)</div>`;
   }
   const routeName = Core.routeName;
   // 칩 속 작은 길 그림 (엔진 좌표: y 위쪽)
@@ -1615,10 +1655,17 @@ if (typeof module !== 'undefined') module.exports = Core;
     const bi = rec.evs.findIndex(e => e.type === 'b');
     if (s.tolMM < 7) out.push(['정확도', '허용 오차가 작아요. 힘보다 두께를 먼저 맞추고 스트로크를 짧고 곧게 가져가세요.']);
     if (bi > 0) out.push(['빈쿠션', '쿠션 지점을 보고 칩니다. 회전을 주면 1쿠션 반사각이 달라지니 당점을 정확히 지키세요.']);
-    if (c && c.thick < 0.25 && bi === 0) out.push(['얇은 두께', '회전 때문에 수구가 밀려 두께가 두꺼워지기 쉬워요. 생각보다 살짝 얇게 겨냥하세요.']);
-    if (c && c.thick > 0.7 && bi === 0) out.push(['두꺼운 두께', '수구가 많이 죽어요. 상단으로 밀어 주거나 힘을 한 단계 올려 길을 살리세요.']);
+    // 스쿼트: 수구는 당점 반대쪽으로 밀림. 당점과 맞는 쪽이 같으면 두꺼워지고, 다르면 얇아짐
+    if (c && bi === 0 && s.E !== 0 && (Math.abs(s.E) >= 2 || c.thick < 0.3)) {
+      const th = (c.side === 'R') === (s.E > 0);
+      out.push(['스쿼트', th ? '이 당점이면 수구가 적구 쪽으로 밀려 두께가 두꺼워지기 쉬워요. 살짝 얇게 겨냥하세요.' : '이 당점이면 수구가 적구 바깥으로 밀려 두께가 얇아지기 쉬워요. 살짝 두껍게 겨냥하세요.']);
+    }
+    if (c && c.thick > 0.7 && bi === 0) out.push(['두꺼운 두께', '맞은 뒤 수구가 많이 느려져요. 권장 힘보다 약하게 치지 마세요.']);
     if (Engine.VERT[s.vk].key === 'low') out.push(['끌어치기', '하단은 거리가 멀수록 효과가 줄어요. 큐를 낮고 길게 밀어 주세요.']);
-    if (Math.abs(s.E) >= 3) out.push(['3팁 회전', '미스큐가 잘 나는 당점이에요. 초크를 칠하고, 쿠션 뒤 각이 크게 벌어지는 걸 감안하세요.']);
+    if (Math.abs(s.E) >= 3) {
+      const fc = rec.evs.find(e => e.type === 'c');
+      out.push(['3팁 회전', '미스큐가 잘 나는 당점이에요. 초크를 꼭 칠하세요. ' + (!fc || fc.run ? '진행 방향 회전이라 쿠션을 맞고 각이 넓어져요.' : '역회전이라 쿠션을 맞고 각이 좁아져요.')]);
+    }
     if (s.pw.lv >= 4) out.push(['큰 힘', '세게 칠수록 두께 오차가 커져요. 브리지를 단단히 하고 팔로우를 끝까지.']);
     if (s.risk.kiss) out.push(['키스', '샷 보기를 느리게 틀어 두 공이 스치는 순간을 보세요. 두께나 힘을 조금 바꾸면 피할 수 있어요.']);
     if (s.risk.objHit) out.push(['적구 충돌', '1적구가 2적구를 건드려 자리가 바뀔 수 있어요. 1적구 힘을 줄이는 두께를 고르세요.']);
@@ -1628,7 +1675,6 @@ if (typeof module !== 'undefined') module.exports = Core;
   function shotType(rec) {
     const bi = rec.evs.findIndex(e => e.type === 'b');
     if (bi === 0) return '공 먼저';
-    if (bi >= 3) return '뱅크샷';
     return `빈쿠션 ${bi}쿠션 먼저`;
   }
   function routeHTML(rec) {
@@ -1641,31 +1687,79 @@ if (typeof module !== 'undefined') module.exports = Core;
     }
     return `<div class="route">${parts.join('<span class="arr">→</span>')}</div>`;
   }
-  function diff(tol) {
-    if (tol >= 14) return { cls: 'easy', tag: 'good', t: '쉬움' };
-    if (tol >= 7) return { cls: 'mid', tag: 'warn', t: '보통' };
+  // 난이도: 엔진의 ease(각도 폭·허용 오차 중 작은 쪽) 기준, 없으면 허용 오차로
+  function diff(s) {
+    const e = s.ease != null ? s.ease : s.tolMM / 14;
+    if (e >= 1) return { cls: 'easy', tag: 'good', t: '쉬움' };
+    if (e >= 0.5) return { cls: 'mid', tag: 'warn', t: '보통' };
     return { cls: 'hard', tag: 'bad', t: '어려움' };
   }
   function pipsHTML(lv) { let s = '<span class="pips" aria-hidden="true">'; for (let i = 1; i <= 5; i++) s += `<i class="${i <= lv ? 'on' : ''}"></i>`; return s + '</span>'; }
 
   // ---------- 상태 표시 ----------
+  // 배치 출처마다 이름을 따로 씀. 사진은 공마다 찾았는지 보여 줌
+  const SRCNAME = { sample: '예시 배치 · 끌어서 바꾸기', saved: '지난번 배치', manual: '직접 놓은 배치', random: '무작위 배치', code: '받은 배치' };
   function renderStatus() {
     const el = $('#status'); const out = [];
-    if (state.source === 'sample') out.push('<span class="pill">예시 배치</span>');
-    else if (state.source === 'saved') out.push('<span class="pill">지난 배치</span>');
+    if (SRCNAME[state.source]) out.push(`<span class="pill">${SRCNAME[state.source]}</span>`);
     else {
       for (const k of ['white', 'yellow', 'red']) {
         const ok = state.detect && state.detect[k];
-        out.push(`<span class="pill ${ok ? '' : 'miss'}"><span class="dot" style="background:var(--ball-${k})"></span>${ok ? BALLNAME[k] : BALLNAME[k] + ' 확인'}</span>`);
+        out.push(`<span class="pill ${ok ? '' : 'miss'}"><span class="dot" style="background:var(--ball-${k})"></span>${BALLNAME[k]} ${ok ? '찾음' : '확인 필요'}</span>`);
       }
     }
     if (state.solving) out.push('<span class="pill busy">계산 중</span>');
     el.innerHTML = out.join('');
   }
 
+  // 길 하나를 짧게: 제목, 겨냥(공 먼저는 두께, 빈쿠션은 다이아몬드), 당점 약칭
+  function brief(s, C) {
+    const rec = s.rec, c = rec.contact, bi = rec.evs.findIndex(e => e.type === 'b');
+    const rn = routeName(rec), ball = BALLNAME[objKey(c.idx)];
+    const b = { bi, title: bi === 0 ? `${ball} · ${rn.name}` : rn.name };
+    b.tipS = s.E === 0 ? Engine.VERT[s.vk].label : `${s.E > 0 ? '우' : '좌'}${Math.abs(s.E)}팁 ${Engine.VERT[s.vk].label}`;
+    if (bi === 0) {
+      const th = thickLabel(c.thick).replace(' 두께', '');
+      b.chipAim = c.thick >= 0.94 ? th : `${c.side === 'L' ? '왼' : '오'} ${th}`;
+      b.aim = c.thick >= 0.94 ? `${ball} ${th}` : `${ball} ${c.side === 'L' ? '왼쪽' : '오른쪽'} ${th}`;
+    } else {
+      const dh = diaFor(C, rec, rec.evs[0]) || rec.evs[0];
+      b.chipAim = `${RAILNAME[dh.rail]} 다이아 ${railPoint(dh)}`;
+      b.aim = `${RAILNAME[dh.rail]}쿠션 다이아몬드 ${railPoint(dh)} 먼저`;
+    }
+    return b;
+  }
+  const motion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+
+  // 당구대 바로 아래 한 줄 요약 (고른 길의 두께·당점·힘)
+  let stripHTML = '';
+  function renderStrip() {
+    const el = $('#recStrip'), s = state.sols[state.sel];
+    const show = state.mode === 'rec' && !!s && !(state.hideAns && !state.revealed);
+    let html = '', label = '당구대 평면도와 공 경로';
+    if (show) {
+      const b = brief(s, Engine.makeCtx(ctxObj())), d = diff(s), tip = tipText(s.E, s.vk);
+      html = `<span class="hd"><b>길 ${state.sel + 1} · ${b.title}</b><span class="tag ${d.tag}">±${s.tolMM.toFixed(0)}mm ${d.t}</span></span>` +
+        `<span class="it${b.bi === 0 ? ' thk' : ''}">${b.bi === 0 ? thickSvg(s.rec.contact) : ''}${b.aim}</span>` +
+        `<span class="it">${tipSvg(s.E, s.vk, 24)}${tip}</span>` +
+        `<span class="it">${pipsHTML(s.pw.lv)}${s.pw.lv}단계 ${s.pw.label}</span>` +
+        `<a href="#solDetail" class="linkish">자세히</a>`;
+      label = `당구대. 추천 길 ${state.sel + 1}: ${b.title}, ${b.aim}, ${tip}, 힘 ${s.pw.lv}단계 ${s.pw.label}`;
+    }
+    el.hidden = !show;
+    // 같은 내용이면 다시 쓰지 않아 화면 낭독기가 되풀이해 읽지 않게 함
+    if (html !== stripHTML) { el.innerHTML = html; stripHTML = html; }
+    $('#cvTable').setAttribute('aria-label', label);
+  }
+  $('#recStrip').addEventListener('click', e => {
+    if (!e.target.closest('a[href="#solDetail"]')) return;
+    e.preventDefault(); $('#solDetail').scrollIntoView({ block: 'start', behavior: motion() });
+  });
+
   function renderRec() {
     const chips = $('#solChips'), det = $('#solDetail');
-    $('#recSub').textContent = state.solving ? '모든 각도·당점을 시험하는 중' : (state.sols.length ? `${state.sols.length}가지 · 쉬운 순` : '');
+    $('#recSub').textContent = state.solving ? '모든 각도·당점을 시험하는 중' : (state.sols.length ? `${state.sols.length}가지 · 추천 순` : '');
+    renderStrip();
     if (state.solving && !state.sols.length) {
       chips.innerHTML = '<div class="chip skel" aria-hidden="true"><span class="thumb"></span><i style="width:60%"></i><i style="width:85%"></i></div>'.repeat(3);
       det.innerHTML = '<p class="empty">모든 각도와 당점을 굴려 보는 중이에요.</p>'; return;
@@ -1681,27 +1775,26 @@ if (typeof module !== 'undefined') module.exports = Core;
       $('#btnReveal').addEventListener('click', () => { state.revealed = true; renderRec(); drawTable(); });
       return;
     }
+    const C = Engine.makeCtx(ctxObj());
     chips.innerHTML = state.sols.map((s, i) => {
-      const d = diff(s.tolMM);
-      const first = BALLNAME[objKey(s.rec.contact.idx)];
-      const bi = s.rec.evs.findIndex(e => e.type === 'b');
-      const rn = routeName(s.rec);
-      const title = bi === 0 ? `${first} · ${rn.name}` : rn.name;
-      const tipS = s.E === 0 ? Engine.VERT[s.vk].label : `${s.E > 0 ? '우' : '좌'}${Math.abs(s.E)}팁 ${Engine.VERT[s.vk].label}`;
+      const d = diff(s), b = brief(s, C);
       return `<button type="button" class="chip" data-i="${i}" aria-pressed="${i === state.sel}">
         ${thumbSvg(s.rec)}
-        <span class="n"><span class="lvl ${d.cls}"></span>길 ${i + 1}</span>
-        <span class="t">${title}</span>
-        <span class="s">${tipS} · 힘 ${s.pw.label}</span></button>`;
+        <span class="n"><span class="lvl ${d.cls}" aria-hidden="true"></span>길 ${i + 1} · ${d.t}</span>
+        <span class="t">${b.title}</span>
+        <span class="s">${b.chipAim} · ${b.tipS} · ${s.pw.label}</span></button>`;
     }).join('');
     const s = state.sols[state.sel];
-    const d = diff(s.tolMM);
+    const d = diff(s);
     const bi = s.rec.evs.findIndex(e => e.type === 'b');
     let aim;
     if (bi === 0) aim = `<div class="thick">${thickSvg(s.rec.contact)}<div>${aimText(s.rec)}${aimPointText(s.rec)}</div></div>`;
     else {
-      const f = s.rec.evs[0];
-      aim = `<div class="thick">${thickSvg(s.rec.contact)}<div>${RAILNAME[f.rail]}쿠션 <span class="num">${railPoint(f)}</span> 지점을 먼저 겨냥<div class="sub">${aimText(s.rec)}로 맞음</div></div></div>`;
+      // 빈쿠션: 다이아몬드를 보고 겨냥하고, 쿠션에 실제로 닿는 곳을 함께 보여 줌
+      const f = s.rec.evs[0], dh = diaFor(C, s.rec, f);
+      const fp = `${RAILNAME[f.rail]}쿠션 <span class="num">${railPoint(f)}</span>`;
+      const top = dh ? `${RAILNAME[dh.rail]}쿠션 다이아몬드 <span class="num">${railPoint(dh)}</span>${eul(railPoint(dh))} 보고 겨냥 · 쿠션 맞는 곳 ${fp}` : `${fp} 지점을 먼저 겨냥`;
+      aim = `<div class="thick">${thickSvg(s.rec.contact)}<div>${top}<div class="sub">${aimText(s.rec)}로 맞음</div></div></div>`;
     }
     const risks = [];
     if (s.risk.kiss) risks.push('<span class="tag warn">키스 가능</span>');
@@ -1719,7 +1812,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     <div class="detail-actions"><button type="button" class="btn sm primary" id="btnPlay2">샷 보기</button><button type="button" class="btn sm" id="btnTryAim">이 길로 직접 조준해 보기</button><button type="button" class="btn sm" id="btnCoach"${Ai.sample ? '' : ' hidden'}>Claude 코치에게 설명 듣기</button></div>
     <div class="coach" id="coachOut" aria-live="polite" hidden></div>`;
     $('#btnCoach').addEventListener('click', coach);
-    $('#btnPlay2').addEventListener('click', () => { $('#cvTable').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); if (!anim) playShot(); });
+    $('#btnPlay2').addEventListener('click', () => { $('#cvTable').scrollIntoView({ block: 'nearest', behavior: motion() }); if (!anim) playShot(); });
     $('#btnTryAim').addEventListener('click', () => $('#mAim').click());
   }
 
@@ -2146,6 +2239,7 @@ if (typeof module !== 'undefined') module.exports = Core;
     $('#viewTable').classList.toggle('sys', m === 'sys');
     if (m === 'sys') computeSys();
     $('#tableHint').textContent = m === 'aim' ? '빈 곳을 끌면 조준, 공을 끌면 위치 이동이에요.' : m === 'sys' ? '수구를 끌어 옮기면 표가 바로 바뀌어요.' : '공을 끌어서 위치를 고칠 수 있어요. 놓으면 길을 다시 계산합니다.';
+    renderStrip();
     if (m === 'aim') {
       const s = state.sols[state.sel];
       if (s && !aimShot) { state.aim.theta = s.theta; state.aim.E = s.E; state.aim.vk = s.vk; state.aim.power = Math.min(5, s.pw.lv); }

@@ -17,7 +17,7 @@ async function open(opts = {}) {
   p.on('pageerror', e => p.errors.push(e.message));
   p.on('console', m => { if (m.type() === 'error') p.errors.push(m.text()); });
   await p.goto('file://' + page + (opts.hash || ''));
-  if (!opts.noWait) await p.waitForSelector('.chip', { timeout: 30000 });
+  if (!opts.noWait) await p.waitForSelector('#solChips .chip:not(.skel)', { timeout: 30000 }); // 스켈레톤이 아니라 계산이 끝난 칩
   return p;
 }
 const noErr = p => assert.deepEqual(p.errors, []);
@@ -25,7 +25,17 @@ const noErr = p => assert.deepEqual(p.errors, []);
 test('E2E 1: 첫 화면에 추천 길과 길 이름이 뜨고 오류 없음', async () => {
   const p = await open();
   const t = await p.$$eval('.chip .t', e => e.map(x => x.textContent));
-  assert.ok(t.length >= 1 && t.every(x => x.length > 0));
+  assert.ok(t.length >= 1 && t.length <= 6 && t.every(x => x.length > 0), String(t.length));
+  // 당구대 바로 아래 한 줄 요약이 첫 화면(400x900)에 보이고 힘 단계까지 나옴
+  assert.equal(await p.isVisible('#recStrip'), true);
+  assert.match(await p.textContent('#recStrip'), /단계/);
+  const nav = await p.$eval('.tabs', n => n.getBoundingClientRect().top);
+  const strip = await p.$eval('#recStrip .pips', n => n.getBoundingClientRect().bottom);
+  assert.ok(strip <= nav, `strip ${strip} nav ${nav}`);
+  assert.match(await p.textContent('#recSub'), /추천 순/);
+  // 칩마다 난이도를 글자로도 표시
+  assert.ok((await p.$$eval('.chip .n', e => e.map(x => x.textContent))).every(x => /쉬움|보통|어려움/.test(x)));
+  assert.match(await p.getAttribute('#cvTable', 'aria-label'), /추천 길 1/);
   noErr(p); await p.context().close();
 });
 test('E2E 2: 샷 보기 재생·멈춤', async () => {
@@ -258,7 +268,7 @@ async function openMock(opts = {}) {
   const p = await ctx.newPage();
   p.errors = []; p.on('pageerror', e => p.errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') p.errors.push(m.text()); });
   await p.goto('file://' + page + (opts.hash || ''));
-  if (!opts.noWait) await p.waitForSelector('.chip', { timeout: 30000 });
+  if (!opts.noWait) await p.waitForSelector('#solChips .chip:not(.skel)', { timeout: 30000 }); // 스켈레톤이 아니라 계산이 끝난 칩
   return p;
 }
 
@@ -457,6 +467,31 @@ test('E2E 36: 글꼴 서버가 응답하지 않아도 첫 화면과 추천 길�
   await p.goto('file://' + page, { waitUntil: 'commit' });
   await p.waitForSelector('.chip', { timeout: 15000 });
   assert.ok(await p.$('link[rel="stylesheet"][href*="fonts.googleapis.com/css2"]'), '글꼴은 나중에 붙여야 함');
+  assert.deepEqual(p.errors, []);
+  await ctx.close();
+});
+test('E2E 37: 다시 계산하는 동안 지난 길은 지우고, 몰린 계산은 하나로 합침', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 400, height: 900 } });
+  await ctx.addInitScript(() => {
+    window.__posts = 0;
+    if (window.Worker) { const pm = Worker.prototype.postMessage; Worker.prototype.postMessage = function (m) { window.__posts++; return pm.call(this, m); }; }
+  });
+  const p = await ctx.newPage();
+  p.errors = []; p.on('pageerror', e => p.errors.push(e.message));
+  await p.goto('file://' + page);
+  await p.waitForSelector('#solChips .chip:not(.skel)', { timeout: 30000 });
+  // 같은 틱에서 세 번 요청: 바로 스켈레톤이 보이고 지난 길·요약 줄은 사라짐
+  const r = await p.evaluate(() => {
+    window.__posts = 0;
+    for (let i = 0; i < 3; i++) document.getElementById('btnRandom').click();
+    return { skel: document.querySelectorAll('#solChips .chip.skel').length, real: document.querySelectorAll('#solChips .chip:not(.skel)').length, strip: document.getElementById('recStrip').hidden };
+  });
+  assert.deepEqual(r, { skel: 3, real: 0, strip: true });
+  await p.waitForFunction(() => !document.querySelector('#solChips .chip.skel'), null, { timeout: 30000 });
+  // 워커는 처음 1번 + 끝난 뒤 최신 배치로 1번만 계산
+  assert.ok(await p.evaluate(() => window.__posts) <= 2);
+  assert.ok(await p.$$eval('#solChips .chip', e => e.length) <= 6);
+  assert.equal(await p.evaluate(() => document.querySelector('#status').textContent.includes('계산 중')), false);
   assert.deepEqual(p.errors, []);
   await ctx.close();
 });
